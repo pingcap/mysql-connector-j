@@ -122,6 +122,11 @@ public class RandomBalanceStrategy implements BalanceStrategy {
         return null; // we won't get here, compiler can't tell
     }
 
+    @Override
+    public JdbcConnection pickConnection(InvocationHandler proxy, List<String> configuredHosts, Map<String, JdbcConnection> liveConnections, long[] responseTimes, int numRetries, String hostPortPair) throws SQLException {
+        return null;
+    }
+
     private Map<String, Integer> getArrayIndexMap(List<String> l) {
         Map<String, Integer> m = new HashMap<>(l.size());
         for (int i = 0; i < l.size(); i++) {
