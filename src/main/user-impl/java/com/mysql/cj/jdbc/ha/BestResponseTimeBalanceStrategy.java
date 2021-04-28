@@ -30,6 +30,7 @@
 package com.mysql.cj.jdbc.ha;
 
 import java.lang.reflect.InvocationHandler;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
@@ -114,4 +115,10 @@ public class BestResponseTimeBalanceStrategy implements BalanceStrategy {
 
         return null; // we won't get here, compiler can't tell
     }
+
+    @Override
+    public JdbcConnection pickConnection(InvocationHandler proxy, List<String> configuredHosts, Map<String, JdbcConnection> liveConnections, long[] responseTimes, int numRetries, String hostPortPair) throws SQLException {
+        return null;
+    }
+
 }

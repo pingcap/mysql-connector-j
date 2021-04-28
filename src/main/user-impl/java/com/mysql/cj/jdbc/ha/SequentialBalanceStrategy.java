@@ -161,4 +161,9 @@ public class SequentialBalanceStrategy implements BalanceStrategy {
         return null; // we won't get here, compiler can't tell
     }
 
+    @Override
+    public JdbcConnection pickConnection(InvocationHandler proxy, List<String> configuredHosts, Map<String, JdbcConnection> liveConnections, long[] responseTimes, int numRetries, String hostPortPair) throws SQLException {
+        return null;
+    }
+
 }
