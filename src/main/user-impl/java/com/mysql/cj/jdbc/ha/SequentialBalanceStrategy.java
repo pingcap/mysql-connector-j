@@ -162,8 +162,9 @@ public class SequentialBalanceStrategy implements BalanceStrategy {
     }
 
     @Override
-    public JdbcConnection pickConnection(InvocationHandler proxy, List<String> configuredHosts, Map<String, JdbcConnection> liveConnections, long[] responseTimes, int numRetries, String hostPortPair) throws SQLException {
+    public JdbcConnection pickConnection(InvocationHandler proxy, String hostPortPair) throws SQLException {
         return null;
     }
+
 
 }
