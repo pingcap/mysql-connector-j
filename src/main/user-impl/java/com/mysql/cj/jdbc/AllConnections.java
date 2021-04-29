@@ -1,17 +1,16 @@
 package com.mysql.cj.jdbc;
 
-import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class AllConnections {
 
-    private static HashMap<String, Integer> map = new HashMap<>();
+    private static ConcurrentHashMap<String, Integer> map = new ConcurrentHashMap<>();
 
-    public HashMap<String, Integer> getMap() {
+    public ConcurrentHashMap<String, Integer> getMap() {
         return map;
     }
 
-    public void setMap(HashMap<String, Integer> map) {
+    public void setMap(ConcurrentHashMap<String, Integer> map) {
         this.map = map;
     }
 
