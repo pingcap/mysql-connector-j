@@ -52,6 +52,7 @@ import com.mysql.cj.exceptions.ExceptionFactory;
 import com.mysql.cj.exceptions.MysqlErrorNumbers;
 import com.mysql.cj.interceptors.QueryInterceptor;
 import com.mysql.cj.jdbc.*;
+import com.mysql.cj.jdbc.exceptions.CommunicationsException;
 import com.mysql.cj.jdbc.exceptions.SQLError;
 import com.mysql.cj.jdbc.exceptions.SQLExceptionsMapping;
 import com.mysql.cj.util.Util;
@@ -346,17 +347,22 @@ public class LoadBalancedConnectionProxy extends MultiHostConnectionProxy implem
             return;
         }
 
-        List<String> hostPortList = Collections.unmodifiableList(this.hostsList.stream().map(hi -> hi.getHostPortPair()).collect(Collectors.toList()));
+        List<String> hostPortList = Collections.unmodifiableList(this.hostsList.stream().map(HostInfo::getHostPortPair).collect(Collectors.toList()));
         Properties props = connectionUrl.getConnectionArgumentsAsProperties();
         if (this.currentConnection == null) { // startup
             String strategy = props.getProperty("loadBalanceStrategy");
             if ("lasting".equals(strategy)) {
                 Integer num = 0;
-                synchronized (num){
-                    List<Map.Entry<String, Integer>> hostList = new ArrayList<>();
-                    hostList.addAll(allConnections.getMap().entrySet());
-                    Collections.sort(hostList, Comparator.comparing(Map.Entry::getValue));
-                    this.currentConnection = this.balancer.pickConnection(this, hostList.get(0).getKey());
+                synchronized (num) {
+                    List<Map.Entry<String, Integer>> hostList = new ArrayList<>(allConnections.getMap().entrySet());
+                    hostList.sort(Map.Entry.comparingByValue());
+                    try {
+                        this.currentConnection = this.balancer.pickConnection(this, hostList.get(0).getKey());
+                    } catch (Exception e) {
+                        allConnections.getMap().remove(hostList.get(0).getKey());
+                        e.printStackTrace();
+                        throw e;
+                    }
                     num = allConnections.getMap().get(hostList.get(0).getKey());
                     allConnections.getMap().put(hostList.get(0).getKey(), ++num);
                 }
