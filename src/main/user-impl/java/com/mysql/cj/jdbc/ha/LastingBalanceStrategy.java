@@ -15,26 +15,12 @@ public class LastingBalanceStrategy implements BalanceStrategy {
 
     @Override
     public JdbcConnection pickConnection(InvocationHandler proxy, List<String> configuredHosts, Map<String, JdbcConnection> liveConnections, long[] responseTimes, int numRetries) throws SQLException {
-        int numHosts = configuredHosts.size();
-        List<String> whiteList = new ArrayList<>(numHosts);
-        whiteList.addAll(configuredHosts);
-        Map<String, Long> blackList = ((LoadBalancedConnectionProxy) proxy).getGlobalBlacklist();
-        whiteList.removeAll(blackList.keySet());
-        String hostPortSpec = whiteList.get(0);
-        ConnectionImpl conn = ((LoadBalancedConnectionProxy) proxy).createConnectionForHost(hostPortSpec);
-        return conn;
+        return null;
     }
 
     @Override
-    public JdbcConnection pickConnection(InvocationHandler proxy, List<String> configuredHosts, Map<String, JdbcConnection> liveConnections, long[] responseTimes, int numRetries, String hostPortPair) throws SQLException {
-        int numHosts = configuredHosts.size();
-        List<String> whiteList = new ArrayList<>(numHosts);
-        whiteList.addAll(configuredHosts);
-        Map<String, Long> blackList = ((LoadBalancedConnectionProxy) proxy).getGlobalBlacklist();
-        whiteList.removeAll(blackList.keySet());
-        ConnectionImpl conn = null;
-        conn = ((LoadBalancedConnectionProxy) proxy).createConnectionForHost(hostPortPair);
-        return conn;
+    public JdbcConnection pickConnection(InvocationHandler proxy, String hostPortPair) throws SQLException {
+        return ((LoadBalancedConnectionProxy) proxy).createConnectionForHost(hostPortPair);
     }
 
 }

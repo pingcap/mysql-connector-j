@@ -5,13 +5,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class AllConnections {
 
-    private static ConcurrentHashMap<String, Integer> map = new ConcurrentHashMap<>();
+    private static HashMap<String, Integer> map = new HashMap<>();
 
-    public ConcurrentHashMap<String, Integer> getMap() {
+    public HashMap<String, Integer> getMap() {
         return map;
     }
 
-    public void setMap(ConcurrentHashMap<String, Integer> map) {
+    public void setMap(HashMap<String, Integer> map) {
         this.map = map;
     }
 

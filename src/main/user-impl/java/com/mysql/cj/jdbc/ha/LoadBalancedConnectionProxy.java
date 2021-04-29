@@ -351,34 +351,19 @@ public class LoadBalancedConnectionProxy extends MultiHostConnectionProxy implem
         if (this.currentConnection == null) { // startup
             String strategy = props.getProperty("loadBalanceStrategy");
             if ("lasting".equals(strategy)) {
-                int n = 0;
-                Integer min = 0;
-                String min_host = "";
-                synchronized (min) {
-                    for (String host : allConnections.getMap().keySet()) {
-                        if (n == 0) {
-                            min = allConnections.getMap().get(host);
-                            min_host = host;
-                            n++;
-                        } else {
-                            if (allConnections.getMap().get(host) < min) {
-                                min = allConnections.getMap().get(host);
-                                min_host = host;
-                            }
-                            n++;
-                        }
-                    }
-                    allConnections.getMap().put(min_host, ++min);
+                Integer num = 0;
+                synchronized (num){
+                    List<Map.Entry<String, Integer>> hostList = new ArrayList<>();
+                    hostList.addAll(allConnections.getMap().entrySet());
+                    Collections.sort(hostList, Comparator.comparing(Map.Entry::getValue));
+                    this.currentConnection = this.balancer.pickConnection(this, hostList.get(0).getKey());
+                    num = allConnections.getMap().get(hostList.get(0).getKey());
+                    allConnections.getMap().put(hostList.get(0).getKey(), ++num);
                 }
-                this.currentConnection = this.balancer.pickConnection(this, hostPortList, Collections.unmodifiableMap(this.liveConnections),
-                        this.responseTimes.clone(), this.retriesAllDown, min_host);
-                int num = allConnections.getMap().get(this.currentConnection.getHostPortPair());
-                allConnections.getMap().put(this.currentConnection.getHostPortPair(), ++num);
             } else {
                 this.currentConnection = this.balancer.pickConnection(this, hostPortList, Collections.unmodifiableMap(this.liveConnections),
                         this.responseTimes.clone(), this.retriesAllDown);
             }
-
             return;
         }
 
@@ -391,7 +376,7 @@ public class LoadBalancedConnectionProxy extends MultiHostConnectionProxy implem
 
         for (int hostsTried = 0, hostsToTry = this.hostsList.size(); hostsTried < hostsToTry; hostsTried++) {
             ConnectionImpl newConn = null;
-            if("lasting".equals(props.getProperty("loadBalanceStrategy"))){
+            if ("lasting".equals(props.getProperty("loadBalanceStrategy"))) {
                 return;
             }
             try {
