@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2020, Oracle and/or its affiliates.
+ * Copyright (c) 2002, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License, version 2.0, as published by the
@@ -36,10 +36,10 @@ import java.math.BigDecimal;
 import java.sql.Clob;
 import java.sql.JDBCType;
 import java.sql.NClob;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLType;
 import java.sql.SQLXML;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +48,7 @@ import java.util.TreeMap;
 
 import com.mysql.cj.Messages;
 import com.mysql.cj.MysqlType;
+import com.mysql.cj.PreparedQuery;
 import com.mysql.cj.conf.PropertyDefinitions.DatabaseTerm;
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.exceptions.AssertionFailedException;
@@ -283,7 +284,7 @@ public class UpdatableResultSet extends ResultSetImpl {
                     }
 
                     // Can't reference more than one database
-                    if ((dbName == null) || !otherDbName.equals(dbName)) {
+                    if ((dbName == null) || !dbName.equals(otherDbName)) {
                         this.isUpdatable = false;
                         this.notUpdatableReason = Messages.getString("NotUpdatableReason.1");
 
@@ -475,8 +476,11 @@ public class UpdatableResultSet extends ResultSetImpl {
                 ps.setDate(psIdx, getDate(rsIdx + 1));
                 break;
             case TIMESTAMP:
+                ((PreparedQuery<?>) ps.getQuery()).getQueryBindings().bindTimestamp(ps.getCoreParameterIndex(psIdx), getTimestamp(rsIdx + 1), null,
+                        field.getDecimals(), MysqlType.TIMESTAMP);
+                break;
             case DATETIME:
-                ps.setTimestamp(psIdx, getTimestamp(rsIdx + 1), null, field.getDecimals());
+                ps.setObject(psIdx, getObject(rsIdx + 1, LocalDateTime.class), MysqlType.DATETIME, field.getDecimals());
                 break;
             case TIME:
                 // TODO adjust nanos to decimal numbers
@@ -974,7 +978,7 @@ public class UpdatableResultSet extends ResultSetImpl {
     @Override
     public void refreshRow() throws SQLException {
         synchronized (checkClosed().getConnectionMutex()) {
-            if (getType() == ResultSet.TYPE_FORWARD_ONLY) {
+            if (isStrictlyForwardOnly()) {
                 throw ExceptionFactory.createException(Messages.getString("ResultSet.ForwardOnly"));
             }
 

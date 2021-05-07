@@ -1,6 +1,63 @@
 # Changelog
 # https://dev.mysql.com/doc/relnotes/connector-j/8.0/en/
 
+Version 8.0.24
+
+  - Fix for Bug#102188 (32526663), AccessControlException with AuthenticationLdapSaslClientPlugin.
+
+  - Fix for Bug#22508715, SETSESSIONMAXROWS() CALL ON CLOSED CONNECTION RESULTS IN NPE.
+
+  - Fix for Bug#102131 (32338451), UPDATABLERESULTSET NPE WHEN USING DERIVED QUERIES OR VIEWS.
+
+  - Fix for Bug#101596 (32151143), GET THE 'HOST' PROPERTY ERROR AFTER CALLING TRANSFORMPROPERTIES() METHOD.
+
+  - Fix for Bug#20391832, SETOBJECT() FOR TYPES.TIME RESULTS IN EXCEPTION WHEN VALUE HAS FRACTIONAL PART.
+
+  - Fix for Bug#97730 (31699993), xdev api: ConcurrentModificationException at Session.close.
+
+  - Fix for Bug#99708 (31510398), mysql-connector-java 8.0.20 ASSERTION FAILED: Unknown message type: 57 s.close.
+
+  - Fix for Bug#32122553, EXTRA BYTE IN COM_STMT_EXECUTE.
+
+  - Fix for Bug#101558 (32141210), NULLPOINTEREXCEPTION WHEN EXECUTING INVALID QUERY WITH USEUSAGEADVISOR ENABLED.
+
+  - Fix for Bug#102076 (32329915), CONTRIBUTION: MYSQL JDBC DRIVER RESULTSET.GETLONG() THROWS NUMBEROUTOFRANGE.
+
+  - Fix for Bug#31747910, BUG 30474158 FIX IMPROVES JDBC COMPLIANCE BUT CHANGES DEFAULT RESULTSETTYPE HANDLING.
+
+  - Fix for Bug#102321 (32405590), CALLING RESULTSETMETADATA.GETCOLUMNCLASSNAME RETURNS WRONG VALUE FOR DATETIME.
+
+  - WL#14453, Pluggable authentication: new default behavior & user-less authentications.
+
+  - WL#14392, Improve timeout error messages [classic].
+
+  - WL#14202, XProtocol: Support connection close notification.
+
+Version 8.0.23
+
+  - Fix for Bug#21789378, FORCED TO SET SERVER TIMEZONE IN CONNECT STRING.
+
+  - Fix for Bug#95644 (30573281), JDBC GETDATE/GETTIME/GETTIMESTAMP INTERFACE BEHAVIOR CHANGE AFTER UPGRADE 8.0.
+
+  - Fix for Bug#94457 (29402209), CONNECTOR/J RESULTSET.GETOBJECT( ..., OFFSETDATETIME.CLASS ) THROWS.
+
+  - Fix for Bug#76775 (20959249), FRACTIONAL SECONDS IN TIME VALUES ARE NOT AVAILABLE VIA JDBC.
+
+  - Fix for Bug#99013 (31074051), AN EXTRA HOUR GETS ADDED TO THE TIMESTAMP WHEN SUBTRACTING INTERVAL 'N' DAYS.
+
+  - Fix for Bug#98695 (30962953), EXECUTION OF "LOAD DATA LOCAL INFILE" COMMAND THROUGH JDBC FOR DATETIME COLUMN.
+
+  - Fix for Bug#101413 (32099505), JAVA.TIME.LOCALDATETIME CANNOT BE CAST TO JAVA.SQL.TIMESTAMP.
+
+  - Fix for Bug#101242 (32046007), CANNOT USE BYTEARRAYINPUTSTREAM AS ARGUMENTS IN PREPARED STATEMENTS ANYMORE.
+    Thanks to Martynas Puronas for his contribution.
+
+  - WL#14274, Support for authentication_ldap_sasl_client(SCRAM-SHA-256) authentication plugin.
+
+  - WL#14206, Support for authentication_ldap_sasl_client(GSSAPI) authentication plugin.
+
+  - WL#14207, Replace language in APIs and source code/docs.
+
 Version 8.0.22
 
   - Fix for Bug#98667 (31711961), "All pipe instances are busy" exception on multiple connections to named Pipe.

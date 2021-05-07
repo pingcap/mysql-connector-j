@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2020, Oracle and/or its affiliates.
+ * Copyright (c) 2002, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License, version 2.0, as published by the
@@ -296,7 +296,7 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
     }
 
     /**
-     * Check to see if the statement is safe for read-only slaves after failover.
+     * Check to see if the statement is safe for read-only replicas after failover.
      * 
      * @return true if safe for read-only.
      * @throws SQLException
@@ -1301,7 +1301,8 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
             }
 
             if (this.useUsageAdvisor) {
-                if (((PreparedQuery<?>) this.query).getQueryBindings().getNumberOfExecutions() <= 1) {
+                QueryBindings<?> qb = ((PreparedQuery<?>) this.query).getQueryBindings();
+                if (qb == null || qb.getNumberOfExecutions() <= 1) {
                     this.session.getProfilerEventHandler().processEvent(ProfilerEvent.TYPE_USAGE, this.session, this, null, 0, new Throwable(),
                             Messages.getString("PreparedStatement.43"));
                 }
@@ -1380,7 +1381,7 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
         }
     }
 
-    protected final int getCoreParameterIndex(int paramIndex) throws SQLException {
+    public final int getCoreParameterIndex(int paramIndex) throws SQLException {
         int parameterIndexOffset = getParameterIndexOffset();
         checkBounds(paramIndex, parameterIndexOffset);
         return paramIndex - 1 + parameterIndexOffset;
@@ -1770,20 +1771,21 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
     @Override
     public void setTimestamp(int parameterIndex, Timestamp x) throws java.sql.SQLException {
         synchronized (checkClosed().getConnectionMutex()) {
-            ((PreparedQuery<?>) this.query).getQueryBindings().setTimestamp(getCoreParameterIndex(parameterIndex), x);
+            ((PreparedQuery<?>) this.query).getQueryBindings().setTimestamp(getCoreParameterIndex(parameterIndex), x, MysqlType.TIMESTAMP);
         }
     }
 
     @Override
     public void setTimestamp(int parameterIndex, java.sql.Timestamp x, Calendar cal) throws SQLException {
         synchronized (checkClosed().getConnectionMutex()) {
-            ((PreparedQuery<?>) this.query).getQueryBindings().setTimestamp(getCoreParameterIndex(parameterIndex), x, cal);
+            ((PreparedQuery<?>) this.query).getQueryBindings().setTimestamp(getCoreParameterIndex(parameterIndex), x, cal, MysqlType.TIMESTAMP);
         }
     }
 
     public void setTimestamp(int parameterIndex, Timestamp x, Calendar targetCalendar, int fractionalLength) throws SQLException {
         synchronized (checkClosed().getConnectionMutex()) {
-            ((PreparedQuery<?>) this.query).getQueryBindings().setTimestamp(getCoreParameterIndex(parameterIndex), x, targetCalendar, fractionalLength);
+            ((PreparedQuery<?>) this.query).getQueryBindings().setTimestamp(getCoreParameterIndex(parameterIndex), x, targetCalendar, fractionalLength,
+                    MysqlType.TIMESTAMP);
         }
     }
 

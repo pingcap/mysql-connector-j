@@ -67,6 +67,9 @@ import java.sql.SQLSyntaxErrorException;
 import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.sql.Types;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -1339,47 +1342,15 @@ public class ConnectionTest extends BaseTestCase {
         }
 
         boolean didOneWork = false;
-        boolean didOneFail = false;
-
         for (LocalSocketAddressCheckThread t : allChecks) {
             if (t.atLeastOneWorked) {
                 didOneWork = true;
 
                 break;
             }
-            if (!didOneFail) {
-                didOneFail = true;
-            }
         }
 
         assertTrue(didOneWork, "At least one connection was made with the localSocketAddress set");
-
-        String hostname = getHostFromTestsuiteUrl();
-
-        if (!hostname.startsWith(":") && !hostname.startsWith("localhost")) {
-
-            int indexOfColon = hostname.indexOf(":");
-
-            if (indexOfColon != -1) {
-                hostname = hostname.substring(0, indexOfColon);
-            }
-
-            boolean isLocalIf = false;
-
-            isLocalIf = (null != NetworkInterface.getByName(hostname));
-
-            if (!isLocalIf) {
-                try {
-                    isLocalIf = (null != NetworkInterface.getByInetAddress(InetAddress.getByName(hostname)));
-                } catch (Throwable t) {
-                    isLocalIf = false;
-                }
-            }
-
-            if (!isLocalIf) {
-                assertTrue(didOneFail, "At least one connection didn't fail with localSocketAddress set");
-            }
-        }
     }
 
     class SpawnedWorkerCounter {
@@ -1843,9 +1814,11 @@ public class ConnectionTest extends BaseTestCase {
         connProps.setProperty(PropertyKey.USER.getKeyName(), testUser);
         connProps.setProperty(PropertyKey.PASSWORD.getKeyName(), testUser);
 
-        List<Inet6Address> ipv6List = TestUtils.getIpv6List();
+        List<Inet6Address> ipv6List = isMysqlRunningLocally() ? TestUtils.getIpv6List() : TestUtils.getIpv6List(getHostFromTestsuiteUrl());
         List<String> ipv6Addrs = ipv6List.stream().map((e) -> e.getHostAddress()).collect(Collectors.toList());
-        ipv6Addrs.add("::1"); // IPv6 loopback
+        if (isMysqlRunningLocally()) {
+            ipv6Addrs.add("::1"); // IPv6 loopback
+        }
         int port = getPortFromTestsuiteUrl();
 
         boolean atLeastOne = false;
@@ -1872,7 +1845,11 @@ public class ConnectionTest extends BaseTestCase {
         }
 
         if (!atLeastOne) {
-            fail("None of the tested hosts have server sockets listening on the port " + port + ". This test requires a MySQL server running in local host.");
+            if (isMysqlRunningLocally()) {
+                fail("None of the tested hosts have server sockets listening on the port " + port + ".");
+            } else {
+                System.err.println("None of the tested hosts have server sockets listening on the port " + port + ".");
+            }
         }
     }
 
@@ -2020,6 +1997,7 @@ public class ConnectionTest extends BaseTestCase {
             props.setProperty(PropertyKey.enableEscapeProcessing.getKeyName(), Boolean.toString(enableEscapeProcessing));
             props.setProperty(PropertyKey.processEscapeCodesForPrepStmts.getKeyName(), Boolean.toString(processEscapeCodesForPrepStmts));
             props.setProperty(PropertyKey.useServerPrepStmts.getKeyName(), Boolean.toString(useServerPrepStmts));
+            props.setProperty(PropertyKey.connectionTimeZone.getKeyName(), "LOCAL");
 
             Connection testConn = getConnectionWithProps(testUrl, props);
             this.stmt = testConn.createStatement();
@@ -2029,18 +2007,33 @@ public class ConnectionTest extends BaseTestCase {
                     processEscapeCodesForPrepStmts ? "procEscProcPS" : "-", useServerPrepStmts ? "useSSPS" : "-");
             assertTrue(this.rs.next(), testCase);
             assertEquals(1d, this.rs.getDouble(1), testCase);
-            assertEquals(testTimestamp, this.rs.getTimestamp(2), testCase);
+
+            Timestamp ts = !enableEscapeProcessing && this.rs.getMetaData().getColumnType(2) == Types.VARCHAR ?
+            // MySQL 5.5 returns {ts '2015-08-16 11:22:33'} as a VARCHAR column, while newer servers return it as a DATETIME
+                    Timestamp.from(ZonedDateTime
+                            .of(2015, 8, 16, 11, 22, 33, 0, ((MysqlConnection) testConn).getSession().getServerSession().getSessionTimeZone().toZoneId())
+                            .withZoneSameInstant(ZoneId.systemDefault()).toInstant())
+                    : testTimestamp;
+
+            assertEquals(ts, this.rs.getTimestamp(2), testCase);
             assertEquals("THIS IS MYSQL", this.rs.getString(3), testCase);
             assertFalse(this.rs.next(), testCase);
 
             this.pstmt = testConn.prepareStatement(String.format(query, tst));
             this.rs = this.pstmt.executeQuery();
 
+            ts = !processEscapeCodesForPrepStmts && this.rs.getMetaData().getColumnType(2) == Types.VARCHAR ?
+            // MySQL 5.5 returns {ts '2015-08-16 11:22:33'} as a VARCHAR column, while newer servers return it as a DATETIME
+                    Timestamp.from(ZonedDateTime
+                            .of(2015, 8, 16, 11, 22, 33, 0, ((MysqlConnection) testConn).getSession().getServerSession().getSessionTimeZone().toZoneId())
+                            .withZoneSameInstant(ZoneId.systemDefault()).toInstant())
+                    : testTimestamp;
+
             testCase = String.format("Case: %d [ %s | %s | %s ]/PreparedStatement", tst, enableEscapeProcessing ? "enEscProc" : "-",
                     processEscapeCodesForPrepStmts ? "procEscProcPS" : "-", useServerPrepStmts ? "useSSPS" : "-");
             assertTrue(this.rs.next(), testCase);
             assertEquals(1d, this.rs.getDouble(1), testCase);
-            assertEquals(testTimestamp, this.rs.getTimestamp(2), testCase);
+            assertEquals(ts, this.rs.getTimestamp(2), testCase);
             assertEquals("THIS IS MYSQL", this.rs.getString(3), testCase);
             assertFalse(this.rs.next(), testCase);
 
@@ -2923,4 +2916,47 @@ public class ConnectionTest extends BaseTestCase {
         assertEquals("TEST DATA", this.rs.getString(1));
         assertEquals(1, this.stmt.executeUpdate("DELETE FROM testAllowLoadLocalInfileInPath"));
     }
+
+    /**
+     * Tests WL#14392, Improve timeout error messages [classic].
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testTimeoutErrors() throws Exception {
+        int seconds = 2;
+        Properties props = new Properties();
+        props.setProperty(PropertyKey.sessionVariables.getKeyName(), "wait_timeout=" + seconds);
+
+        Connection timeoutConn = getConnectionWithProps(props);
+        Thread.sleep(1500 * seconds);
+        if (versionMeetsMinimum(8, 0, 24) && !(isServerRunningOnWindows() && System.getProperty("os.name").contains("Windows"))) { // server reports timeout
+            // TS.1.1 Create a connection to a MySQL configured with a short session timeout value.
+            // Sleep for a time longer than the specified timeout and assess that the error message obtained is the new one.        
+            assertThrows(CommunicationsException.class,
+                    "The client was disconnected by the server because of inactivity. See wait_timeout and interactive_timeout for configuring this behavior.",
+                    () -> timeoutConn.createStatement().executeQuery("SELECT 1"));
+        } else {
+            // TS.2.1 Create a connection to a MySQL configured with a short session timeout value.
+            // Sleep for a time longer than the specified timeout and assess that the error message obtained is the old one.
+            assertThrows(CommunicationsException.class,
+                    "The last packet successfully received from the server was .+ milliseconds ago.+"
+                            + "The last packet sent successfully to the server was .+ milliseconds ago.+"
+                            + "is longer than the server configured value of 'wait_timeout'.+",
+                    () -> timeoutConn.createStatement().executeQuery("SELECT 1"));
+        }
+
+        // TS.1.2 & TS.2.2 Create a connection to a MySQL configured with a short session timeout value.
+        // Before the timeout runs out, use a second connection to kill the previous session.
+        // Assess that the error message obtained is the old one.
+        final Connection toBeKilledConn = getConnectionWithProps(props);
+        long connId = ((MysqlConnection) toBeKilledConn).getSession().getThreadId();
+        this.stmt.execute("KILL CONNECTION " + connId);
+        Thread.sleep(1500 * seconds);
+        assertThrows(CommunicationsException.class,
+                "The last packet successfully received from the server was .+ milliseconds ago."
+                        + " The last packet sent successfully to the server was .+ milliseconds ago.+",
+                () -> toBeKilledConn.createStatement().executeQuery("SELECT 1"));
+    }
+
 }

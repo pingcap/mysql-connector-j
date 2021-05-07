@@ -52,6 +52,8 @@ public abstract class AbstractDateTimeValueFactory<T> extends DefaultValueFactor
 
     abstract T localCreateFromTimestamp(InternalTimestamp its);
 
+    abstract T localCreateFromDatetime(InternalTimestamp its);
+
     @Override
     public T createFromDate(InternalDate idate) {
         if (idate.isZero()) {
@@ -85,6 +87,21 @@ public abstract class AbstractDateTimeValueFactory<T> extends DefaultValueFactor
             }
         }
         return localCreateFromTimestamp(its);
+    }
+
+    @Override
+    public T createFromDatetime(InternalTimestamp its) {
+        if (its.isZero()) {
+            switch (this.pset.<PropertyDefinitions.ZeroDatetimeBehavior>getEnumProperty(PropertyKey.zeroDateTimeBehavior).getValue()) {
+                case CONVERT_TO_NULL:
+                    return null;
+                case ROUND:
+                    return localCreateFromDatetime(new InternalTimestamp(1, 1, 1, 0, 0, 0, 0, 0));
+                default:
+                    break;
+            }
+        }
+        return localCreateFromDatetime(its);
     }
 
     @Override

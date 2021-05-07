@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2020, Oracle and/or its affiliates.
+ * Copyright (c) 2018, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License, version 2.0, as published by the
@@ -66,13 +66,7 @@ public class LocalTimeValueFactoryTest extends CommonAsserts {
 
     @Test
     public void testCreateFromDate() {
-        assertThrows(DataConversionException.class, "Unsupported conversion from DATE to java.time.LocalTime", new Callable<Void>() {
-            @Override
-            public Void call() throws Exception {
-                LocalTimeValueFactoryTest.this.vf.createFromDate(new InternalDate(2018, 1, 1));
-                return null;
-            }
-        });
+        assertEquals(LocalTime.of(0, 0), this.vf.createFromDate(new InternalDate(2018, 1, 1)));
     }
 
     @Test
@@ -80,7 +74,7 @@ public class LocalTimeValueFactoryTest extends CommonAsserts {
         assertEquals(LocalTime.of(1, 1, 1, 1), this.vf.createFromTime(new InternalTime(1, 1, 1, 1, 9)));
 
         assertThrows(DataReadException.class,
-                "The value '-1:0:0' is an invalid TIME value. JDBC Time objects represent a wall-clock time and not a duration as MySQL treats them. If you are treating this type as a duration, consider retrieving this value as a string and dealing with it according to your requirements.",
+                "The value '-1:00:00' is an invalid TIME value. JDBC Time objects represent a wall-clock time and not a duration as MySQL treats them. If you are treating this type as a duration, consider retrieving this value as a string and dealing with it according to your requirements.",
                 new Callable<Void>() {
                     @Override
                     public Void call() throws Exception {
@@ -90,7 +84,7 @@ public class LocalTimeValueFactoryTest extends CommonAsserts {
                 });
 
         assertThrows(DataReadException.class,
-                "The value '44:0:0' is an invalid TIME value. JDBC Time objects represent a wall-clock time and not a duration as MySQL treats them. If you are treating this type as a duration, consider retrieving this value as a string and dealing with it according to your requirements.",
+                "The value '44:00:00' is an invalid TIME value. JDBC Time objects represent a wall-clock time and not a duration as MySQL treats them. If you are treating this type as a duration, consider retrieving this value as a string and dealing with it according to your requirements.",
                 new Callable<Void>() {
                     @Override
                     public Void call() throws Exception {
@@ -185,14 +179,7 @@ public class LocalTimeValueFactoryTest extends CommonAsserts {
 
         assertEquals(LocalTime.of(3, 4, 5, 600000000), this.vf.createFromBytes("2018-01-02 03:04:05.6".getBytes(), 0, 21, f));
         assertEquals(LocalTime.of(3, 4, 5, 600000000), this.vf.createFromBytes("03:04:05.6".getBytes(), 0, 10, f));
-
-        assertThrows(DataConversionException.class, "Unsupported conversion from DATE to java.time.LocalTime", new Callable<Void>() {
-            @Override
-            public Void call() throws Exception {
-                LocalTimeValueFactoryTest.this.vf.createFromBytes("2018-01-02".getBytes(), 0, 10, f);
-                return null;
-            }
-        });
+        assertEquals(LocalTime.of(0, 0), this.vf.createFromBytes("2018-01-02".getBytes(), 0, 10, f));
 
         assertThrows(DataConversionException.class, "Cannot convert string '1' to java.time.LocalTime value", new Callable<Void>() {
             @Override

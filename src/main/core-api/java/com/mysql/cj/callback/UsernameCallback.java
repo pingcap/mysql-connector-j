@@ -27,30 +27,25 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
  */
 
-package com.mysql.cj.protocol.x;
-
-import java.io.FilterInputStream;
-import java.io.InputStream;
+package com.mysql.cj.callback;
 
 /**
- * An {@link InputStream} wrapper that allows switching to different underlying {@link InputStream}s under the same {@link InputStream} instance.
+ * A callback that can be used to exchange username information to a callback handler owner.
  */
-public class ReusableInputStream extends FilterInputStream {
-    protected ReusableInputStream(InputStream in) {
-        super(in);
+public class UsernameCallback implements MysqlCallback {
+    private String username;
+
+    public UsernameCallback(String username) {
+        this.username = username;
     }
 
     /**
-     * Sets a new underlying {@link InputStream} in this {@link ReusableInputStream}.
+     * Get the username provided by the caller of {@link MysqlCallbackHandler#handle(MysqlCallback)}.
      * 
-     * @param newIn
-     *            the new {@link InputStream} to set.
      * @return
-     *         the previous underlying {@link InputStream}.
+     *         the username to pass over to the callback handler.
      */
-    public InputStream setInputStream(InputStream newIn) {
-        InputStream previousIn = this.in;
-        this.in = newIn;
-        return previousIn;
+    public String getUsername() {
+        return this.username;
     }
 }

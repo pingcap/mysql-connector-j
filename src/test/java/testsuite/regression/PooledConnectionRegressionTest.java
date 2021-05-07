@@ -479,12 +479,12 @@ public final class PooledConnectionRegressionTest extends BaseTestCase {
         assertFalse(cw.hasTriedMaster());
         assertFalse(cw.isClosed());
         assertFalse(cw.isInGlobalTx());
-        assertFalse(cw.isMasterConnection());
+        assertFalse(cw.isSourceConnection());
         assertFalse(cw.isProxySet());
         assertFalse(cw.isReadOnly());
         assertFalse(cw.isReadOnly(false));
         assertFalse(cw.isReadOnly(true));
-        assertTrue(cw.isServerLocal());
+        assertEquals(isMysqlRunningLocally(), cw.isServerLocal());
         assertTrue(cw.isValid(10));
         assertTrue(cw.isWrapperFor(Connection.class));
         assertEquals(((JdbcConnection) this.conn).lowerCaseTableNames(), cw.lowerCaseTableNames());
@@ -831,7 +831,7 @@ public final class PooledConnectionRegressionTest extends BaseTestCase {
         assertFalse(cw.hasTriedMaster());
         assertTrue(cw.isClosed());
         assertFalse(cw.isInGlobalTx());
-        assertFalse(cw.isMasterConnection());
+        assertFalse(cw.isSourceConnection());
         assertFalse(cw.isProxySet());
 
         assertThrows(SQLNonTransientConnectionException.class, "Logical handle no longer valid", new Callable<Void>() {
@@ -852,7 +852,7 @@ public final class PooledConnectionRegressionTest extends BaseTestCase {
                 return null;
             }
         });
-        assertTrue(cw.isServerLocal());
+        assertEquals(isMysqlRunningLocally(), cw.isServerLocal());
         assertTrue(cw.isValid(10));
         assertTrue(cw.isWrapperFor(Connection.class));
         assertEquals(((JdbcConnection) this.conn).lowerCaseTableNames(), cw.lowerCaseTableNames());
@@ -1283,7 +1283,7 @@ public final class PooledConnectionRegressionTest extends BaseTestCase {
         assertFalse(cw.hasTriedMaster());
         assertTrue(cw.isClosed());
         assertFalse(cw.isInGlobalTx());
-        assertFalse(cw.isMasterConnection());
+        assertFalse(cw.isSourceConnection());
         assertFalse(cw.isProxySet());
 
         assertThrows(SQLNonTransientConnectionException.class, "Logical handle no longer valid", new Callable<Void>() {

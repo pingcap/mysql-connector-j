@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2020, Oracle and/or its affiliates.
+ * Copyright (c) 2015, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License, version 2.0, as published by the
@@ -71,14 +71,20 @@ public class SqlTimeValueFactory extends AbstractDateTimeValueFactory<Time> {
 
     @Override
     Time localCreateFromDate(InternalDate idate) {
-        return unsupported("DATE");
+        synchronized (this.cal) {
+            try {
+                this.cal.clear();
+                return new Time(this.cal.getTimeInMillis());
+            } catch (IllegalArgumentException e) {
+                throw ExceptionFactory.createException(WrongArgumentException.class, e.getMessage(), e);
+            }
+        }
     }
 
     @Override
     public Time localCreateFromTime(InternalTime it) {
         if (it.getHours() < 0 || it.getHours() >= 24) {
-            throw new DataReadException(
-                    Messages.getString("ResultSet.InvalidTimeValue", new Object[] { "" + it.getHours() + ":" + it.getMinutes() + ":" + it.getSeconds() }));
+            throw new DataReadException(Messages.getString("ResultSet.InvalidTimeValue", new Object[] { it.toString() }));
         }
 
         synchronized (this.cal) {
@@ -95,7 +101,7 @@ public class SqlTimeValueFactory extends AbstractDateTimeValueFactory<Time> {
     }
 
     @Override
-    public Time localCreateFromTimestamp(InternalTimestamp its) {
+    public Time localCreateFromDatetime(InternalTimestamp its) {
         if (this.warningListener != null) {
             // TODO: need column context
             this.warningListener.warningEncountered(Messages.getString("ResultSet.PrecisionLostWarning", new Object[] { "java.sql.Time" }));
@@ -106,8 +112,14 @@ public class SqlTimeValueFactory extends AbstractDateTimeValueFactory<Time> {
     }
 
     @Override
-    public Time createFromYear(long year) {
-        return unsupported("YEAR");
+    public Time localCreateFromTimestamp(InternalTimestamp its) {
+        if (this.warningListener != null) {
+            // TODO: need column context
+            this.warningListener.warningEncountered(Messages.getString("ResultSet.PrecisionLostWarning", new Object[] { "java.sql.Time" }));
+        }
+
+        // truncate date information
+        return createFromTime(new InternalTime(its.getHours(), its.getMinutes(), its.getSeconds(), its.getNanos(), its.getScale()));
     }
 
     public String getTargetTypeName() {

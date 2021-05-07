@@ -43,6 +43,8 @@ import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -92,6 +94,7 @@ public abstract class BaseTestCase {
      * JDBC URL, initialized from com.mysql.cj.testsuite.url system property, or defaults to jdbc:mysql:///test and its connection URL.
      */
     public static String dbUrl = "jdbc:mysql:///test";
+    public static String timeZoneFreeDbUrl = "jdbc:mysql:///test";
     protected static ConnectionUrl mainConnectionUrl = null;
 
     /**
@@ -119,6 +122,9 @@ public abstract class BaseTestCase {
 
     /** My instance number */
     private int myInstanceNumber = 0;
+
+    /** Is MySQL running locally? */
+    private Boolean mysqlRunningLocally = null;
 
     /**
      * Default catalog.
@@ -159,6 +165,8 @@ public abstract class BaseTestCase {
         if ((newDbUrl != null) && (newDbUrl.trim().length() != 0)) {
             dbUrl = newDbUrl;
         }
+        timeZoneFreeDbUrl = dbUrl.replaceAll(PropertyKey.connectionTimeZone.getKeyName() + "=", PropertyKey.connectionTimeZone.getKeyName() + "VOID=")
+                .replaceAll("serverTimezone=", "serverTimezoneVOID=");
         mainConnectionUrl = ConnectionUrl.getConnectionUrlInstance(dbUrl, null);
         this.dbName = mainConnectionUrl.getDatabase();
 
@@ -473,7 +481,7 @@ public abstract class BaseTestCase {
 
     /**
      * Some tests build connections strings for internal usage but, in order for them to work, they may require some connection properties set in the main test
-     * suite URL. For example 'serverTimezone' is one of those properties.
+     * suite URL. For example 'connectionTimeZone' is one of those properties.
      * 
      * @param props
      *            the Properties object where to add the missing connection properties
@@ -485,8 +493,8 @@ public abstract class BaseTestCase {
             props = new Properties();
         }
 
-        // Add 'serverTimezone' if set in test suite URL and missing from props.
-        String propKey = PropertyKey.serverTimezone.getKeyName();
+        // Add 'connectionTimeZone' if set in test suite URL and missing from props.
+        String propKey = PropertyKey.connectionTimeZone.getKeyName();
         String origTzValue = null;
         if (!props.containsKey(propKey) && (origTzValue = mainConnectionUrl.getOriginalProperties().get(propKey)) != null) {
             props.setProperty(propKey, origTzValue);
@@ -623,7 +631,7 @@ public abstract class BaseTestCase {
     }
 
     protected final boolean runLongTests() {
-        return runTestIfSysPropDefined(PropertyDefinitions.SYSP_testsuite_runLongTests);
+        return isSysPropDefined(PropertyDefinitions.SYSP_testsuite_runLongTests);
     }
 
     /**
@@ -635,14 +643,14 @@ public abstract class BaseTestCase {
      * 
      * @return true if the property is defined.
      */
-    protected boolean runTestIfSysPropDefined(String propName) {
+    protected boolean isSysPropDefined(String propName) {
         String prop = System.getProperty(propName);
 
         return (prop != null) && (prop.length() > 0);
     }
 
     protected boolean runMultiHostTests() {
-        return !runTestIfSysPropDefined(PropertyDefinitions.SYSP_testsuite_disable_multihost_tests);
+        return !isSysPropDefined(PropertyDefinitions.SYSP_testsuite_disable_multihost_tests);
     }
 
     /**
@@ -867,6 +875,24 @@ public abstract class BaseTestCase {
         return (vmVendor != null && vmVendor.toUpperCase(Locale.US).startsWith("BEA"));
     }
 
+    protected boolean isMysqlRunningLocally() {
+        if (this.mysqlRunningLocally != null) {
+            return this.mysqlRunningLocally;
+        }
+        try {
+            String clientHostname = InetAddress.getLocalHost().getHostName();
+
+            this.rs = this.stmt.executeQuery("SHOW VARIABLES LIKE 'hostname'");
+            this.rs.next();
+            String serverHostname = this.rs.getString(2);
+
+            this.mysqlRunningLocally = clientHostname.equalsIgnoreCase(serverHostname);
+        } catch (UnknownHostException | SQLException e) {
+            this.mysqlRunningLocally = false;
+        }
+        return this.mysqlRunningLocally;
+    }
+
     protected String randomString() {
         int length = (int) (Math.random() * 32);
 
@@ -984,7 +1010,7 @@ public abstract class BaseTestCase {
             testRoutine.call();
         } catch (Throwable t) {
             if (!throwable.isAssignableFrom(t.getClass())) {
-                fail(message + "expected exception of type '" + throwable.getName() + "' but instead a exception of type '" + t.getClass().getName()
+                fail(message + "expected exception of type '" + throwable.getName() + "' but instead an exception of type '" + t.getClass().getName()
                         + "' was thrown.");
             }
 
@@ -1098,24 +1124,24 @@ public abstract class BaseTestCase {
     }
 
     protected Connection getFailoverConnection(Properties props) throws SQLException {
-        return DriverManager.getConnection(getMasterSlaveUrl(), getHostFreePropertiesFromTestsuiteUrl(props));
+        return DriverManager.getConnection(getSourceReplicaUrl(), getHostFreePropertiesFromTestsuiteUrl(props));
     }
 
-    protected Connection getMasterSlaveReplicationConnection() throws SQLException {
-        return getMasterSlaveReplicationConnection(null);
+    protected Connection getSourceReplicaReplicationConnection() throws SQLException {
+        return getSourceReplicaReplicationConnection(null);
     }
 
-    protected Connection getMasterSlaveReplicationConnection(Properties props) throws SQLException {
-        String replicationUrl = getMasterSlaveUrl(ConnectionUrl.Type.REPLICATION_CONNECTION.getScheme());
+    protected Connection getSourceReplicaReplicationConnection(Properties props) throws SQLException {
+        String replicationUrl = getSourceReplicaUrl(ConnectionUrl.Type.REPLICATION_CONNECTION.getScheme());
         Connection replConn = new NonRegisteringDriver().connect(replicationUrl, getHostFreePropertiesFromTestsuiteUrl(props));
         return replConn;
     }
 
-    protected String getMasterSlaveUrl() throws SQLException {
-        return getMasterSlaveUrl(ConnectionUrl.Type.FAILOVER_CONNECTION.getScheme());
+    protected String getSourceReplicaUrl() throws SQLException {
+        return getSourceReplicaUrl(ConnectionUrl.Type.FAILOVER_CONNECTION.getScheme());
     }
 
-    protected String getMasterSlaveUrl(String protocol) throws SQLException {
+    protected String getSourceReplicaUrl(String protocol) throws SQLException {
         HostInfo hostInfo = mainConnectionUrl.getMainHost();
         String hostPortPair = TestUtils.encodePercent(hostInfo.getHostPortPair());
         return String.format("%s//%s,%s/", protocol, hostPortPair, hostPortPair);

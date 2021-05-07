@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2020, Oracle and/or its affiliates.
+ * Copyright (c) 2002, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License, version 2.0, as published by the
@@ -294,9 +294,6 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     /** isolation level */
     private int isolationLevel = java.sql.Connection.TRANSACTION_READ_COMMITTED;
 
-    /** When did the master fail? */
-    //	private long masterFailTimeMillis = 0L;
-
     /**
      * An array of currently open statements.
      * Copy-on-write used here to avoid ConcurrentModificationException when statements unregister themselves while we iterate over the list.
@@ -340,7 +337,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     /*
      * For testing failover scenarios
      */
-    private boolean hasTriedMasterFlag = false;
+    private boolean hasTriedSourceFlag = false;
 
     private List<QueryInterceptor> queryInterceptors;
 
@@ -388,8 +385,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             this.origPortToConnectTo = hostInfo.getPort();
 
             this.database = hostInfo.getDatabase();
-            this.user = StringUtils.isNullOrEmpty(hostInfo.getUser()) ? "" : hostInfo.getUser();
-            this.password = StringUtils.isNullOrEmpty(hostInfo.getPassword()) ? "" : hostInfo.getPassword();
+            this.user = hostInfo.getUser();
+            this.password = hostInfo.getPassword();
 
             this.props = hostInfo.exposeAsProperties();
 
@@ -630,7 +627,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     @Deprecated
     @Override
     public void clearHasTriedMaster() {
-        this.hasTriedMasterFlag = false;
+        this.hasTriedSourceFlag = false;
     }
 
     @Override
@@ -817,8 +814,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     @Override
     public void createNewIO(boolean isForReconnect) {
         synchronized (getConnectionMutex()) {
-            // Synchronization Not needed for *new* connections, but defintely for connections going through fail-over, since we might get the new connection up
-            // and running *enough* to start sending cached or still-open server-side prepared statements over to the backend before we get a chance to
+            // Synchronization Not needed for *new* connections, but definitely for connections going through fail-over, since we might get the new connection
+            // up and running *enough* to start sending cached or still-open server-side prepared statements over to the backend before we get a chance to
             // re-prepare them...
 
             try {
@@ -1274,7 +1271,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     @Deprecated
     @Override
     public boolean hasTriedMaster() {
-        return this.hasTriedMasterFlag;
+        return this.hasTriedSourceFlag;
     }
 
     /**
@@ -1398,7 +1395,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     }
 
     @Override
-    public boolean isMasterConnection() {
+    public boolean isSourceConnection() {
         return false; // handled higher up
     }
 
@@ -1486,7 +1483,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             return null;
         }
 
-        Object escapedSqlResult = EscapeProcessor.escapeSQL(sql, getMultiHostSafeProxy().getSession().getServerSession().getServerTimeZone(),
+        Object escapedSqlResult = EscapeProcessor.escapeSQL(sql, getMultiHostSafeProxy().getSession().getServerSession().getSessionTimeZone(),
                 getMultiHostSafeProxy().getSession().getServerSession().getCapabilities().serverSupportsFracSecs(),
                 getMultiHostSafeProxy().getSession().getServerSession().isServerTruncatesFracSecs(), getExceptionInterceptor());
 
@@ -1498,7 +1495,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     }
 
     private CallableStatement parseCallableStatement(String sql) throws SQLException {
-        Object escapedSqlResult = EscapeProcessor.escapeSQL(sql, getMultiHostSafeProxy().getSession().getServerSession().getServerTimeZone(),
+        Object escapedSqlResult = EscapeProcessor.escapeSQL(sql, getMultiHostSafeProxy().getSession().getServerSession().getSessionTimeZone(),
                 getMultiHostSafeProxy().getSession().getServerSession().getCapabilities().serverSupportsFracSecs(),
                 getMultiHostSafeProxy().getSession().getServerSession().isServerTruncatesFracSecs(), getExceptionInterceptor());
 
@@ -2429,6 +2426,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     @Override
     public void setSessionMaxRows(int max) throws SQLException {
         synchronized (getConnectionMutex()) {
+            checkClosed();
             if (this.session.getSessionMaxRows() != max) {
                 this.session.setSessionMaxRows(max);
                 this.session.execSQL(null, "SET SQL_SELECT_LIMIT=" + (this.session.getSessionMaxRows() == -1 ? "DEFAULT" : this.session.getSessionMaxRows()),

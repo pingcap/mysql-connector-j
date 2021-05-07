@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2020, Oracle and/or its affiliates.
+ * Copyright (c) 2017, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License, version 2.0, as published by the
@@ -47,9 +47,13 @@ import java.sql.NClob;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.util.Calendar;
 
 import com.mysql.cj.conf.PropertyKey;
@@ -446,6 +450,13 @@ public class ClientPreparedQueryBindings extends AbstractQueryBindings<ClientPre
     public void setLocalTime(int parameterIndex, LocalTime x, MysqlType targetMysqlType) {
         if (targetMysqlType == MysqlType.DATE) {
             setValue(parameterIndex, "'" + DEFAULT_DATE + "'", MysqlType.DATE);
+            return;
+        }
+
+        if (!this.session.getServerSession().getCapabilities().serverSupportsFracSecs() || !this.sendFractionalSeconds.getValue()) {
+            if (x.getNano() > 0) {
+                x = x.withNano(0); // truncate nanoseconds
+            }
         } else {
             int fractLen = 6; // max supported length (i.e. microsecond)
             if (this.columnDefinition != null && parameterIndex <= this.columnDefinition.getFields().length && parameterIndex >= 0) {
@@ -453,39 +464,58 @@ public class ClientPreparedQueryBindings extends AbstractQueryBindings<ClientPre
                 fractLen = this.columnDefinition.getFields()[parameterIndex].getDecimals();
             }
 
-            if (!this.sendFractionalSeconds.getValue() || !this.session.getServerSession().getCapabilities().serverSupportsFracSecs()) {
-                x = x.withNano(0); // truncate nanoseconds
-            } else {
-                x = TimeUtil.adjustNanosPrecision(x, fractLen, !this.session.getServerSession().isServerTruncatesFracSecs());
+            x = TimeUtil.adjustNanosPrecision(x, fractLen, !this.session.getServerSession().isServerTruncatesFracSecs());
+        }
+
+        DateTimeFormatter formatter = new DateTimeFormatterBuilder().appendPattern("HH:mm:ss").appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true)
+                .toFormatter();
+
+        switch (targetMysqlType) {
+            case TIME:
+                StringBuilder sb = new StringBuilder("'");
+                sb.append(x.format(formatter));
+                sb.append("'");
+                setValue(parameterIndex, sb.toString(), targetMysqlType);
+                break;
+            case DATETIME:
+            case TIMESTAMP:
+                sb = new StringBuilder("'");
+                sb.append(DEFAULT_DATE);
+                sb.append(" ");
+                sb.append(x.format(formatter));
+                sb.append("'");
+                setValue(parameterIndex, sb.toString(), targetMysqlType);
+                break;
+            default:
+                break;
+        }
+    }
+
+    @Override
+    public void setDuration(int parameterIndex, Duration x, MysqlType targetMysqlType) {
+        if (!this.session.getServerSession().getCapabilities().serverSupportsFracSecs() || !this.sendFractionalSeconds.getValue()) {
+            if (x.getNano() > 0) {
+                x = x.isNegative() ? x.plusSeconds(1).withNanos(0) : x.withNanos(0); // truncate nanoseconds
+            }
+        } else {
+            int fractLen = 6; // max supported length (i.e. microsecond)
+            if (this.columnDefinition != null && parameterIndex <= this.columnDefinition.getFields().length && parameterIndex >= 0) {
+                // use the column definition if available
+                fractLen = this.columnDefinition.getFields()[parameterIndex].getDecimals();
             }
 
-            switch (targetMysqlType) {
-                case TIME:
-                    StringBuilder sb = new StringBuilder("'");
-                    sb.append(x.toString());
-                    if (sb.length() < 7) {
-                        // LocalTime.toString() omits zero parts, so we need to append zero minutes to be consistent with SSPS
-                        sb.append(":00");
-                    }
-                    sb.append("'");
-                    setValue(parameterIndex, sb.toString(), targetMysqlType);
-                    break;
-                case DATETIME:
-                case TIMESTAMP:
-                    sb = new StringBuilder("'");
-                    sb.append(DEFAULT_DATE);
-                    sb.append(" ");
-                    sb.append(x.toString());
-                    if (sb.length() < 18) {
-                        // LocalTime.toString() omits zero parts, so we need to append zero minutes to be consistent with SSPS
-                        sb.append(":00");
-                    }
-                    sb.append("'");
-                    setValue(parameterIndex, sb.toString(), targetMysqlType);
-                    break;
-                default:
-                    break;
-            }
+            x = TimeUtil.adjustNanosPrecision(x, fractLen, !this.session.getServerSession().isServerTruncatesFracSecs());
+        }
+
+        switch (targetMysqlType) {
+            case TIME:
+                StringBuilder sb = new StringBuilder("'");
+                sb.append(TimeUtil.getDurationString(x));
+                sb.append("'");
+                setValue(parameterIndex, sb.toString(), targetMysqlType);
+                break;
+            default:
+                break;
         }
     }
 
@@ -494,39 +524,50 @@ public class ClientPreparedQueryBindings extends AbstractQueryBindings<ClientPre
         if (targetMysqlType == MysqlType.DATE) {
             setValue(parameterIndex, "'" + x.toLocalDate() + "'", MysqlType.DATE);
         } else {
-            int fractLen = 6; // max supported length (i.e. microsecond)
+            int fractLen; // max supported length (i.e. microsecond)
+
+            switch (targetMysqlType) {
+                case CHAR:
+                case VARCHAR:
+                case TINYTEXT:
+                case TEXT:
+                case MEDIUMTEXT:
+                case LONGTEXT:
+                    fractLen = 9;
+                    break;
+                default:
+                    fractLen = 6;
+                    break;
+            }
+
             if (this.columnDefinition != null && parameterIndex <= this.columnDefinition.getFields().length && parameterIndex >= 0) {
                 // use the column definition if available
                 fractLen = this.columnDefinition.getFields()[parameterIndex].getDecimals();
             }
 
-            if (!this.sendFractionalSeconds.getValue() || !this.session.getServerSession().getCapabilities().serverSupportsFracSecs()) {
-                x = x.withNano(0); // truncate nanoseconds
+            if (!this.session.getServerSession().getCapabilities().serverSupportsFracSecs() || !this.sendFractionalSeconds.getValue()) {
+                if (x.getNano() > 0) {
+                    x = x.withNano(0); // truncate nanoseconds
+                }
             } else {
                 x = TimeUtil.adjustNanosPrecision(x, fractLen, !this.session.getServerSession().isServerTruncatesFracSecs());
             }
 
             switch (targetMysqlType) {
                 case TIME:
+                    DateTimeFormatter formatter = new DateTimeFormatterBuilder().appendPattern("HH:mm:ss")
+                            .appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true).toFormatter();
                     StringBuilder sb = new StringBuilder("'");
-                    sb.append(x.toLocalTime().toString());
-                    if (sb.length() < 7) {
-                        // LocalTime.toString() omits zero parts, so we need to append zero minutes to be consistent with SSPS
-                        sb.append(":00");
-                    }
+                    sb.append(x.toLocalTime().format(formatter));
                     sb.append("'");
                     setValue(parameterIndex, sb.toString(), targetMysqlType);
                     break;
                 case DATETIME:
                 case TIMESTAMP:
+                    formatter = new DateTimeFormatterBuilder().appendPattern("yyyy-MM-dd HH:mm:ss").appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true)
+                            .toFormatter();
                     sb = new StringBuilder("'");
-                    sb.append(x.toLocalDate());
-                    sb.append(" ");
-                    sb.append(x.toLocalTime().toString());
-                    if (sb.length() < 18) {
-                        // LocalTime.toString() omits zero parts, so we need to append zero minutes to be consistent with SSPS
-                        sb.append(":00");
-                    }
+                    sb.append(x.format(formatter));
                     sb.append("'");
                     setValue(parameterIndex, sb.toString(), targetMysqlType);
                     break;
@@ -831,10 +872,16 @@ public class ClientPreparedQueryBindings extends AbstractQueryBindings<ClientPre
     public void setTime(int parameterIndex, Time x, Calendar cal) {
         if (x == null) {
             setNull(parameterIndex);
-        } else if (cal != null) {
-            setValue(parameterIndex, TimeUtil.getSimpleDateFormat("''HH:mm:ss''", cal).format(x), MysqlType.TIME);
+            return;
+        }
+
+        String formatStr = this.session.getServerSession().getCapabilities().serverSupportsFracSecs() && this.sendFractionalSeconds.getValue()
+                && this.sendFractionalSecondsForTime.getValue() && TimeUtil.hasFractionalSeconds(x) ? "''HH:mm:ss.SSS''" : "''HH:mm:ss''";
+
+        if (cal != null) {
+            setValue(parameterIndex, TimeUtil.getSimpleDateFormat(formatStr, cal).format(x), MysqlType.TIME);
         } else {
-            this.tdf = TimeUtil.getSimpleDateFormat(this.tdf, "''HH:mm:ss''", this.session.getServerSession().getServerTimeZone());
+            this.tdf = TimeUtil.getSimpleDateFormat(this.tdf, formatStr, this.session.getServerSession().getDefaultTimeZone());
             setValue(parameterIndex, this.tdf.format(x), MysqlType.TIME);
         }
     }
@@ -844,64 +891,31 @@ public class ClientPreparedQueryBindings extends AbstractQueryBindings<ClientPre
     }
 
     @Override
-    public void setTimestamp(int parameterIndex, Timestamp x) {
-        int fractLen = -1;
-        if (!this.sendFractionalSeconds.getValue() || !this.session.getServerSession().getCapabilities().serverSupportsFracSecs()) {
-            fractLen = 0;
-        } else if (this.columnDefinition != null && parameterIndex <= this.columnDefinition.getFields().length && parameterIndex >= 0) {
-            fractLen = this.columnDefinition.getFields()[parameterIndex].getDecimals();
+    public void bindTimestamp(int parameterIndex, Timestamp x, Calendar targetCalendar, int fractionalLength, MysqlType targetMysqlType) {
+        if (fractionalLength < 0) {
+            // default to 6 fractional positions
+            fractionalLength = 6;
         }
 
-        setTimestamp(parameterIndex, x, null, fractLen);
-    }
+        x = TimeUtil.adjustNanosPrecision(x, fractionalLength, !this.session.getServerSession().isServerTruncatesFracSecs());
 
-    @Override
-    public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) {
-        int fractLen = -1;
-        if (!this.sendFractionalSeconds.getValue() || !this.session.getServerSession().getCapabilities().serverSupportsFracSecs()) {
-            fractLen = 0;
-        } else if (this.columnDefinition != null && parameterIndex <= this.columnDefinition.getFields().length && parameterIndex >= 0
-                && this.columnDefinition.getFields()[parameterIndex].getDecimals() > 0) {
-            fractLen = this.columnDefinition.getFields()[parameterIndex].getDecimals();
-        }
+        StringBuffer buf = new StringBuffer();
 
-        setTimestamp(parameterIndex, x, cal, fractLen);
-    }
-
-    @Override
-    public void setTimestamp(int parameterIndex, Timestamp x, Calendar targetCalendar, int fractionalLength) {
-        if (x == null) {
-            setNull(parameterIndex);
+        if (targetCalendar != null) {
+            buf.append(TimeUtil.getSimpleDateFormat("''yyyy-MM-dd HH:mm:ss", targetCalendar).format(x));
         } else {
-            if (!this.session.getServerSession().getCapabilities().serverSupportsFracSecs()
-                    || !this.sendFractionalSeconds.getValue() && fractionalLength == 0) {
-                x = TimeUtil.truncateFractionalSeconds(x);
-            }
-
-            if (fractionalLength < 0) {
-                // default to 6 fractional positions
-                fractionalLength = 6;
-            }
-
-            x = TimeUtil.adjustNanosPrecision(x, fractionalLength, !this.session.getServerSession().isServerTruncatesFracSecs());
-
-            StringBuffer buf = new StringBuffer();
-
-            if (targetCalendar != null) {
-                buf.append(TimeUtil.getSimpleDateFormat("''yyyy-MM-dd HH:mm:ss", targetCalendar).format(x));
-            } else {
-                this.tsdf = TimeUtil.getSimpleDateFormat(this.tsdf, "''yyyy-MM-dd HH:mm:ss", this.session.getServerSession().getServerTimeZone());
-                buf.append(this.tsdf.format(x));
-            }
-
-            if (this.session.getServerSession().getCapabilities().serverSupportsFracSecs()) {
-                buf.append('.');
-                buf.append(TimeUtil.formatNanos(x.getNanos(), 6));
-            }
-            buf.append('\'');
-
-            setValue(parameterIndex, buf.toString(), MysqlType.TIMESTAMP);
+            this.tsdf = TimeUtil.getSimpleDateFormat(this.tsdf, "''yyyy-MM-dd HH:mm:ss",
+                    targetMysqlType == MysqlType.TIMESTAMP && this.preserveInstants.getValue() ? this.session.getServerSession().getSessionTimeZone()
+                            : this.session.getServerSession().getDefaultTimeZone());
+            buf.append(this.tsdf.format(x));
         }
-    }
 
+        if (this.session.getServerSession().getCapabilities().serverSupportsFracSecs() && x.getNanos() > 0) {
+            buf.append('.');
+            buf.append(TimeUtil.formatNanos(x.getNanos(), 6));
+        }
+        buf.append('\'');
+
+        setValue(parameterIndex, buf.toString(), targetMysqlType);
+    }
 }
