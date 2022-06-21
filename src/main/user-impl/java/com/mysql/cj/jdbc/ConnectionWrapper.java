@@ -156,6 +156,7 @@ public class ConnectionWrapper extends WrapperBase implements JdbcConnection {
         return null; // we don't reach this code, compiler can't tell
     }
 
+
     @Override
     public void setCatalog(String catalog) throws SQLException {
 
