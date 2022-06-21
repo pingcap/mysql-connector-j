@@ -56,11 +56,6 @@ public class LoadBalancedMySQLConnection extends MultiHostMySQLConnection implem
     }
 
     @Override
-    public void refreshSnapshot() {
-
-    }
-
-    @Override
     public void ping(boolean allConnections) throws SQLException {
         if (allConnections) {
             getThisAsProxy().doPing();
