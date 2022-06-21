@@ -157,6 +157,11 @@ public class ConnectionWrapper extends WrapperBase implements JdbcConnection {
     }
 
     @Override
+    public void refreshSnapshot() {
+
+    }
+
+    @Override
     public void setCatalog(String catalog) throws SQLException {
 
         try {

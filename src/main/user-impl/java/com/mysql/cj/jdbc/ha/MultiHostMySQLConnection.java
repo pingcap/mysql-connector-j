@@ -507,6 +507,11 @@ public class MultiHostMySQLConnection implements JdbcConnection {
     }
 
     @Override
+    public void refreshSnapshot() {
+
+    }
+
+    @Override
     public void setCatalog(String catalog) throws SQLException {
         getActiveMySQLConnection().setCatalog(catalog);
     }
