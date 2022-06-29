@@ -92,6 +92,7 @@ import com.mysql.cj.protocol.SocksProxySocketFactory;
 import com.mysql.cj.util.LRUCache;
 import com.mysql.cj.util.StringUtils;
 import com.mysql.cj.util.Util;
+import com.tidb.snapshot.Ticdc;
 
 /**
  * A Connection represents a session with a specific database. Within the context of a Connection, SQL statements are executed and results are returned.
@@ -120,6 +121,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     private static final SQLPermission ABORT_PERM = new SQLPermission("abort");
 
     private final AtomicLong ticdcACIDinitValue = new AtomicLong(0);
+
+    private AtomicLong secondaryTs = new AtomicLong(0);
 
     private StatementImpl stmt;
 
@@ -385,6 +388,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     public ConnectionImpl(HostInfo hostInfo) throws SQLException {
 
         try {
+            this.ticdc = hostInfo.getTicdc();
             // Stash away for later, used to clone this connection for Statement.cancel and Statement.setQueryTimeout().
             this.origHostInfo = hostInfo;
             this.origHostToConnectTo = hostInfo.getHost();
@@ -797,46 +801,67 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         if(!"true".equals(useTicdcACID)){
             return;
         }
-        String sql = buildTidbSnapshotSql();
-        if(sql == null){
-            return;
-        }
-        String ticdcACIDInterval = getTidbSnapshotParameter(TIDB_TICDC_ACID_INTERVAL_KEY,"300000");
-        long setSnapshotTime = System.currentTimeMillis();
-        //System.out.println("Snapshot-tidb_snapshot-timeout:"+(setSnapshotTime - ticdcACIDinitValue.get() - Long.parseLong(ticdcACIDInterval)));
         try {
-            /*
-             * init setSnapshot
-             * */
-            if(ticdcACIDinitValue.get() == 0){
-                setSnapshot(true,sql);
-                ticdcACIDinitValue.set(System.currentTimeMillis());
-            }else if(setSnapshotTime - ticdcACIDinitValue.get() > Long.parseLong(ticdcACIDInterval)){
-                /*
-                 *  long connection setSnapshot
-                 * */
-                setSnapshot(false, sql);
-                ticdcACIDinitValue.set(System.currentTimeMillis());
-            }
+            setSnapshot();
         }catch (SQLException e){
 
         }
-
     }
 
+    private Ticdc ticdc;
 
     public void setSnapshot(Boolean init,String sql) throws SQLException{
+
         if(!init){
             this.session.setSnapshot("");
             //String tidb_snapshot = this.session.queryServerVariable("@@tidb_snapshot");
             //System.out.println("Snapshot-tidb_snapshot-set empty:"+tidb_snapshot);
         }
+        System.out.println("Snapshot-tidb_snapshot-GlobalSecondaryTs:"+this.ticdc.getGlobalSecondaryTs().get()+",name:"+this.ticdc.getName());
         try (final ResultSet resultSet = this.stmt.executeQuery(sql)) {
             while (resultSet.next()) {
                 final String secondaryTs = resultSet.getString("secondary_ts");
                 //System.out.println("Snapshot-tidb_snapshot-db:"+secondaryTs);
                 if(secondaryTs != null){
+                    this.ticdc.getGlobalSecondaryTs().set(Long.parseLong(secondaryTs));
                     this.session.setSnapshot(secondaryTs);
+                    this.ticdc.getGloballasttime().set(System.currentTimeMillis());
+                    this.ticdc.getName().set(Thread.currentThread().getId());
+                    //String tidb_snapshot = this.session.queryServerVariable("@@tidb_snapshot");
+                    //System.out.println("Snapshot-tidb_snapshot-queryServerVariable:"+tidb_snapshot);
+                }
+            }
+        }
+    }
+
+    public void setSnapshot() throws SQLException{
+        if(this.ticdc.getGlobalSecondaryTs().get() == 0){
+            return;
+        }
+
+        if(this.secondaryTs.get() != this.ticdc.getGlobalSecondaryTs().get()){
+            this.session.setSnapshot(this.ticdc.getGlobalSecondaryTs().get()+"");
+            this.secondaryTs.set(this.ticdc.getGlobalSecondaryTs().get());
+            System.out.println("Snapshot-tidb_snapshot-set,:GlobalTs"+this.ticdc.getGlobalSecondaryTs().get()+",secondaryTs:"+this.secondaryTs.get());
+        }
+    }
+
+    public void getSnapshot(TICDC ticdc) throws SQLException{
+        String sql = buildTidbSnapshotSql();
+        if(sql == null){
+            return;
+        }
+        System.out.println("Snapshot-tidb_snapshot-GlobalSecondaryTs:"+this.ticdc.getGlobalSecondaryTs().get()+",Globallasttime:"+this.ticdc.getGloballasttime());
+        try (final ResultSet resultSet = this.stmt.executeQuery(sql)) {
+            while (resultSet.next()) {
+                final String secondaryTs = resultSet.getString("secondary_ts");
+                //System.out.println("Snapshot-tidb_snapshot-db:"+secondaryTs);
+                if(secondaryTs != null){
+                    Long secondaryTsValue = Long.parseLong(secondaryTs);
+                    if(ticdc.getGlobalSecondaryTs().get() != secondaryTsValue){
+                        this.ticdc.getGlobalSecondaryTs().set(Long.parseLong(secondaryTs));
+                        this.ticdc.getGloballasttime().set(System.currentTimeMillis());
+                    }
                     //String tidb_snapshot = this.session.queryServerVariable("@@tidb_snapshot");
                     //System.out.println("Snapshot-tidb_snapshot-queryServerVariable:"+tidb_snapshot);
                 }
