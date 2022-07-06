@@ -804,66 +804,37 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         try {
             setSnapshot();
         }catch (SQLException e){
-
+            System.out.println("refreshSnapshot error:"+e.getMessage());
         }
     }
 
     private Ticdc ticdc;
 
-    public void setSnapshot(Boolean init,String sql) throws SQLException{
-
-        if(!init){
-            this.session.setSnapshot("");
-            //String tidb_snapshot = this.session.queryServerVariable("@@tidb_snapshot");
-            //System.out.println("Snapshot-tidb_snapshot-set empty:"+tidb_snapshot);
-        }
-        System.out.println("Snapshot-tidb_snapshot-GlobalSecondaryTs:"+this.ticdc.getGlobalSecondaryTs().get()+",name:"+this.ticdc.getName());
-        try (final ResultSet resultSet = this.stmt.executeQuery(sql)) {
-            while (resultSet.next()) {
-                final String secondaryTs = resultSet.getString("secondary_ts");
-                //System.out.println("Snapshot-tidb_snapshot-db:"+secondaryTs);
-                if(secondaryTs != null){
-                    this.ticdc.getGlobalSecondaryTs().set(Long.parseLong(secondaryTs));
-                    this.session.setSnapshot(secondaryTs);
-                    this.ticdc.getGloballasttime().set(System.currentTimeMillis());
-                    this.ticdc.getName().set(Thread.currentThread().getId());
-                    //String tidb_snapshot = this.session.queryServerVariable("@@tidb_snapshot");
-                    //System.out.println("Snapshot-tidb_snapshot-queryServerVariable:"+tidb_snapshot);
-                }
-            }
-        }
-    }
-
     public void setSnapshot() throws SQLException{
         if(this.ticdc.getGlobalSecondaryTs().get() == 0){
             return;
         }
-
-        if(this.secondaryTs.get() != this.ticdc.getGlobalSecondaryTs().get()){
+        if(this.secondaryTs.get() == 0){
+            this.session.setSnapshot("");
+            getSnapshot();
+            this.session.setSnapshot(this.secondaryTs.get()+"");
+        }else if(this.ticdc.getGlobalSecondaryTs().get() != 0 && this.secondaryTs.get() != this.ticdc.getGlobalSecondaryTs().get()){
             this.session.setSnapshot(this.ticdc.getGlobalSecondaryTs().get()+"");
             this.secondaryTs.set(this.ticdc.getGlobalSecondaryTs().get());
-            System.out.println("Snapshot-tidb_snapshot-set,:GlobalTs"+this.ticdc.getGlobalSecondaryTs().get()+",secondaryTs:"+this.secondaryTs.get());
         }
     }
 
-    public void getSnapshot(TICDC ticdc) throws SQLException{
+    public void getSnapshot() throws SQLException{
         String sql = buildTidbSnapshotSql();
         if(sql == null){
             return;
         }
-        System.out.println("Snapshot-tidb_snapshot-GlobalSecondaryTs:"+this.ticdc.getGlobalSecondaryTs().get()+",Globallasttime:"+this.ticdc.getGloballasttime());
         try (final ResultSet resultSet = this.stmt.executeQuery(sql)) {
             while (resultSet.next()) {
                 final String secondaryTs = resultSet.getString("secondary_ts");
-                //System.out.println("Snapshot-tidb_snapshot-db:"+secondaryTs);
                 if(secondaryTs != null){
                     Long secondaryTsValue = Long.parseLong(secondaryTs);
-                    if(ticdc.getGlobalSecondaryTs().get() != secondaryTsValue){
-                        this.ticdc.getGlobalSecondaryTs().set(Long.parseLong(secondaryTs));
-                        this.ticdc.getGloballasttime().set(System.currentTimeMillis());
-                    }
-                    //String tidb_snapshot = this.session.queryServerVariable("@@tidb_snapshot");
-                    //System.out.println("Snapshot-tidb_snapshot-queryServerVariable:"+tidb_snapshot);
+                    this.secondaryTs.set(secondaryTsValue);
                 }
             }
         }

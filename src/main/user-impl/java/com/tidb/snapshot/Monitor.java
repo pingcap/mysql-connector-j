@@ -10,6 +10,9 @@ import java.util.Properties;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Monitor {
 
@@ -23,11 +26,13 @@ public class Monitor {
 
     private Properties info;
 
-    private java.sql.Connection conn;
+    private AtomicReference<java.sql.Connection> conn = new AtomicReference<>();
 
     private ScheduledThreadPoolExecutor executor;
 
     private Driver driver;
+
+    private Lock connLock = new ReentrantLock();
 
     private static final AtomicInteger threadId = new AtomicInteger();
 
@@ -73,7 +78,7 @@ public class Monitor {
                             newThread.setDaemon(true);
                             return newThread;
                         });
-        this.executor.setKeepAliveTime(100 * 2, TimeUnit.MILLISECONDS);
+        this.executor.setKeepAliveTime(100, TimeUnit.MILLISECONDS);
         this.executor.allowCoreThreadTimeOut(true);
         this.executor.scheduleWithFixedDelay(
                 this::reload, 0, 1000, TimeUnit.MILLISECONDS);
@@ -85,7 +90,6 @@ public class Monitor {
 
     public void reload(){
 
-        System.out.println("Snapshot-tidb_snapshot-reload:id:"+Thread.currentThread().getId()+",ts:"+this.ticdc.getGlobalSecondaryTs().get()+",Globallasttime:"+this.ticdc.getGloballasttime());
         if(this.url == null){
             return;
         }
@@ -93,29 +97,30 @@ public class Monitor {
             return;
         }
         try {
-            if(this.conn == null){
-                conn = driver.connect(this.url,this.info);
+            if(this.conn.get() == null){
+                if(connLock.tryLock()){
+                    this.conn.set(driver.connect(this.url,this.info));
+                    connLock.unlock();
+                }
             }
-            String ticdcCFname = ((ConnectionImpl) conn).getProperties().get("ticdcCFname")+"";
+            if(this.conn.get() == null){
+                return;
+            }
+            String ticdcCFname = ((ConnectionImpl) conn.get()).getProperties().get("ticdcCFname")+"";
             String sql = buildTidbSnapshotSql(ticdcCFname);
             if(sql == null){
                 return;
             }
-            java.sql.PreparedStatement stmt = conn.prepareStatement( sql);
-            //System.out.println("Snapshot-tidb_snapshot-reload:"+this.ticdc.getGlobalSecondaryTs().get()+",Globallasttime:"+this.ticdc.getGloballasttime());
+            java.sql.PreparedStatement stmt = conn.get().prepareStatement( sql);
             try (final ResultSet resultSet = stmt.executeQuery(sql)) {
                 while (resultSet.next()) {
                     final String secondaryTs = resultSet.getString("secondary_ts");
-                    //System.out.println("Snapshot-tidb_snapshot-db:"+secondaryTs);
                     if(secondaryTs != null){
                         Long secondaryTsValue = Long.parseLong(secondaryTs);
                         if(ticdc.getGlobalSecondaryTs().get() != secondaryTsValue){
                             this.ticdc.getGlobalSecondaryTs().set(Long.parseLong(secondaryTs));
                             this.ticdc.getGloballasttime().set(System.currentTimeMillis());
-                            System.out.println("Snapshot-tidb_snapshot-reload-db:"+this.ticdc.getGlobalSecondaryTs().get()+",Globallasttime:"+this.ticdc.getGloballasttime());
                         }
-                        //String tidb_snapshot = this.session.queryServerVariable("@@tidb_snapshot");
-                        //System.out.println("Snapshot-tidb_snapshot-queryServerVariable:"+tidb_snapshot);
                     }
                 }
             }
