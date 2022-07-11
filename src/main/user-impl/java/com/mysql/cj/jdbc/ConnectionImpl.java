@@ -62,6 +62,7 @@ import com.mysql.cj.Session.SessionEventListener;
 import com.mysql.cj.conf.HostInfo;
 import com.mysql.cj.conf.PropertyDefinitions.DatabaseTerm;
 import com.mysql.cj.conf.PropertyKey;
+import com.mysql.cj.conf.PropertySet;
 import com.mysql.cj.conf.RuntimeProperty;
 import com.mysql.cj.exceptions.CJCommunicationsException;
 import com.mysql.cj.exceptions.CJException;
@@ -101,6 +102,16 @@ import com.tidb.snapshot.Ticdc;
 public class ConnectionImpl implements JdbcConnection, SessionEventListener, Serializable {
 
     private static final long serialVersionUID = 4009476458425101761L;
+
+    private static final String TIDB_USE_TICDC_ACID_KEY = "useTicdcACID";
+
+    private static final String TIDB_TICDC_CF_NAME_KEY = "ticdcCFname";
+
+    private static final String TIDB_TICDC_ACID_INTERVAL_KEY = "ticdcACIDInterval";
+
+    private static final String QUERY_TIDB_SNAPSHOT_SQL =
+            "select `secondary_ts` from `tidb_cdc`.`syncpoint_v1` where `cf` = \"{ticdcCFname}\" order by `primary_ts` desc limit 1";
+
 
     private static final SQLPermission SET_NETWORK_TIMEOUT_PERM = new SQLPermission("setNetworkTimeout");
 
@@ -765,8 +776,6 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         }
     }
 
-
-
     @Override
     public void commit() throws SQLException {
         synchronized (getConnectionMutex()) {
@@ -1098,7 +1107,6 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         StatementImpl stmt = new StatementImpl(getMultiHostSafeProxy(), this.database);
         stmt.setResultSetType(resultSetType);
         stmt.setResultSetConcurrency(resultSetConcurrency);
-
         StatementProxy proxy = new StatementProxy(this,stmt,ticdc);
         return proxy;
     }
