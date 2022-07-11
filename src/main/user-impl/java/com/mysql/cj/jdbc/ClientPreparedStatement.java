@@ -873,6 +873,7 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
             boolean queryIsSelectOnly, ColumnDefinition metadata, boolean isBatch) throws SQLException {
         synchronized (checkClosed().getConnectionMutex()) {
             try {
+
                 // TODO this.connection.refreshSnapshot();
                 JdbcConnection locallyScopedConnection = this.connection;
 

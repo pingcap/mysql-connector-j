@@ -524,7 +524,6 @@ public class NativeSession extends CoreSession implements Serializable {
         }catch (Exception e){
             System.out.println("setSnapshot error"+e);
         }
-
     }
 
     public String getProcessHost() {
