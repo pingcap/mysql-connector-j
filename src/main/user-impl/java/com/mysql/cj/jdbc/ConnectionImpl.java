@@ -46,9 +46,6 @@ import java.util.Random;
 import java.util.Stack;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -65,7 +62,6 @@ import com.mysql.cj.Session.SessionEventListener;
 import com.mysql.cj.conf.HostInfo;
 import com.mysql.cj.conf.PropertyDefinitions.DatabaseTerm;
 import com.mysql.cj.conf.PropertyKey;
-import com.mysql.cj.conf.PropertySet;
 import com.mysql.cj.conf.RuntimeProperty;
 import com.mysql.cj.exceptions.CJCommunicationsException;
 import com.mysql.cj.exceptions.CJException;
@@ -106,25 +102,13 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
     private static final long serialVersionUID = 4009476458425101761L;
 
-    private static final String TIDB_USE_TICDC_ACID_KEY = "useTicdcACID";
-
-    private static final String TIDB_TICDC_CF_NAME_KEY = "ticdcCFname";
-
-    private static final String TIDB_TICDC_ACID_INTERVAL_KEY = "ticdcACIDInterval";
-
-    private static final String QUERY_TIDB_SNAPSHOT_SQL =
-            "select `secondary_ts` from `tidb_cdc`.`syncpoint_v1` where `cf` = \"{ticdcCFname}\" order by `primary_ts` desc limit 1";
-
-
     private static final SQLPermission SET_NETWORK_TIMEOUT_PERM = new SQLPermission("setNetworkTimeout");
 
     private static final SQLPermission ABORT_PERM = new SQLPermission("abort");
 
-    private final AtomicLong ticdcACIDinitValue = new AtomicLong(0);
-
     private AtomicLong secondaryTs = new AtomicLong(0);
 
-    private StatementImpl stmt;
+    private Ticdc ticdc;
 
     @Override
     public String getHost() {
@@ -147,6 +131,14 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         }
         this.topProxy = proxy;
         this.realProxy = this.topProxy instanceof MultiHostMySQLConnection ? ((MultiHostMySQLConnection) proxy).getThisAsProxy() : null;
+    }
+
+    public void setSecondaryTs(Long secondaryTs){
+        this.secondaryTs.set(secondaryTs);
+    }
+
+    public Long getSecondaryTs(){
+        return secondaryTs.get();
     }
 
     // this connection has to be proxied when using multi-host settings so that statements get routed to the right physical connection
@@ -773,72 +765,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         }
     }
 
-    private String getTidbSnapshotParameter(String key,String defaultValue){
-        String value = this.props.getProperty(key);
-        if(value == null){
-            value = defaultValue;
-        }
-        return value;
-    }
 
-    public String buildTidbSnapshotSql(){
-        String ticdcCFname = getTidbSnapshotParameter(TIDB_TICDC_CF_NAME_KEY,null);
-        if(ticdcCFname == null){
-            return null;
-        }
-        String sql = null;
-        if(ticdcCFname != null){
-            sql = QUERY_TIDB_SNAPSHOT_SQL.replace("{ticdcCFname}",ticdcCFname);
-        }
-        return sql;
-    }
-
-    public void refreshSnapshot(){
-        String useTicdcACID = getTidbSnapshotParameter(TIDB_USE_TICDC_ACID_KEY,null);
-        if(useTicdcACID == null){
-            return;
-        }
-        if(!"true".equals(useTicdcACID)){
-            return;
-        }
-        try {
-            setSnapshot();
-        }catch (SQLException e){
-            System.out.println("refreshSnapshot error:"+e.getMessage());
-        }
-    }
-
-    private Ticdc ticdc;
-
-    public void setSnapshot() throws SQLException{
-        if(this.ticdc.getGlobalSecondaryTs().get() == 0){
-            return;
-        }
-        if(this.secondaryTs.get() == 0){
-            this.session.setSnapshot("");
-            getSnapshot();
-            this.session.setSnapshot(this.secondaryTs.get()+"");
-        }else if(this.ticdc.getGlobalSecondaryTs().get() != 0 && this.secondaryTs.get() != this.ticdc.getGlobalSecondaryTs().get()){
-            this.session.setSnapshot(this.ticdc.getGlobalSecondaryTs().get()+"");
-            this.secondaryTs.set(this.ticdc.getGlobalSecondaryTs().get());
-        }
-    }
-
-    public void getSnapshot() throws SQLException{
-        String sql = buildTidbSnapshotSql();
-        if(sql == null){
-            return;
-        }
-        try (final ResultSet resultSet = this.stmt.executeQuery(sql)) {
-            while (resultSet.next()) {
-                final String secondaryTs = resultSet.getString("secondary_ts");
-                if(secondaryTs != null){
-                    Long secondaryTsValue = Long.parseLong(secondaryTs);
-                    this.secondaryTs.set(secondaryTsValue);
-                }
-            }
-        }
-    }
 
     @Override
     public void commit() throws SQLException {
@@ -1171,9 +1098,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         StatementImpl stmt = new StatementImpl(getMultiHostSafeProxy(), this.database);
         stmt.setResultSetType(resultSetType);
         stmt.setResultSetConcurrency(resultSetConcurrency);
-        this.stmt = stmt;
-        //refreshSnapshot();
-        return stmt;
+
+        StatementProxy proxy = new StatementProxy(this,stmt,ticdc);
+        return proxy;
     }
 
     @Override
@@ -1725,9 +1652,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             } else {
                 pStmt = (ClientPreparedStatement) clientPrepareStatement(nativeSql, resultSetType, resultSetConcurrency, false);
             }
-            this.stmt = pStmt;
-            //refreshSnapshot();
-            return pStmt;
+
+            PreparedStatementProxy proxy = new PreparedStatementProxy(this,pStmt,ticdc);
+            return proxy;
         }
     }
 

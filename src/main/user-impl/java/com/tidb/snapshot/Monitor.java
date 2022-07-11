@@ -2,9 +2,10 @@ package com.tidb.snapshot;
 
 
 import com.mysql.cj.jdbc.ConnectionImpl;
+import com.tidb.jdbc.TidbCdcOperate;
+
 import java.sql.Driver;
 
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Properties;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -15,11 +16,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Monitor {
-
-
-    private static final String QUERY_TIDB_SNAPSHOT_SQL =
-            "select `secondary_ts` from `tidb_cdc`.`syncpoint_v1` where `cf` = \"{ticdcCFname}\" order by `primary_ts` desc limit 1";
-
     private Ticdc ticdc = new Ticdc();
 
     private String url;
@@ -78,10 +74,10 @@ public class Monitor {
                             newThread.setDaemon(true);
                             return newThread;
                         });
-        this.executor.setKeepAliveTime(100, TimeUnit.MILLISECONDS);
+        this.executor.setKeepAliveTime(10000, TimeUnit.MILLISECONDS);
         this.executor.allowCoreThreadTimeOut(true);
         this.executor.scheduleWithFixedDelay(
-                this::reload, 0, 1000, TimeUnit.MILLISECONDS);
+                this::reload, 0, 10000, TimeUnit.MILLISECONDS);
     }
 
     public Ticdc get(){
@@ -89,7 +85,6 @@ public class Monitor {
     }
 
     public void reload(){
-
         if(this.url == null){
             return;
         }
@@ -106,37 +101,16 @@ public class Monitor {
             if(this.conn.get() == null){
                 return;
             }
-            String ticdcCFname = ((ConnectionImpl) conn.get()).getProperties().get("ticdcCFname")+"";
-            String sql = buildTidbSnapshotSql(ticdcCFname);
-            if(sql == null){
-                return;
-            }
-            java.sql.PreparedStatement stmt = conn.get().prepareStatement( sql);
-            try (final ResultSet resultSet = stmt.executeQuery(sql)) {
-                while (resultSet.next()) {
-                    final String secondaryTs = resultSet.getString("secondary_ts");
-                    if(secondaryTs != null){
-                        Long secondaryTsValue = Long.parseLong(secondaryTs);
-                        if(ticdc.getGlobalSecondaryTs().get() != secondaryTsValue){
-                            this.ticdc.getGlobalSecondaryTs().set(Long.parseLong(secondaryTs));
-                            this.ticdc.getGloballasttime().set(System.currentTimeMillis());
-                        }
-                    }
+            String secondaryTs = TidbCdcOperate.of((ConnectionImpl) conn.get(),ticdc).getSnapshot();
+            if(secondaryTs != null){
+                Long secondaryTsValue = Long.parseLong(secondaryTs);
+                if(ticdc.getGlobalSecondaryTs().get() != secondaryTsValue){
+                    this.ticdc.getGlobalSecondaryTs().set(Long.parseLong(secondaryTs));
+                    this.ticdc.getGloballasttime().set(System.currentTimeMillis());
                 }
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public String buildTidbSnapshotSql(String ticdcCFname){
-        if(ticdcCFname == null){
-            return null;
-        }
-        String sql = null;
-        if(ticdcCFname != null){
-            sql = QUERY_TIDB_SNAPSHOT_SQL.replace("{ticdcCFname}",ticdcCFname);
-        }
-        return sql;
     }
 }
