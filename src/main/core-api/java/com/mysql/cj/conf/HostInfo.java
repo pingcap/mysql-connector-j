@@ -29,6 +29,9 @@
 
 package com.mysql.cj.conf;
 
+
+import com.tidb.snapshot.Ticdc;
+
 import static com.mysql.cj.util.StringUtils.isNullOrEmpty;
 
 import java.util.Collections;
@@ -55,6 +58,9 @@ public class HostInfo implements DatabaseUrlContainer {
     private final int port;
     private final String user;
     private final String password;
+
+    private Ticdc ticdc = new Ticdc();
+
     private final Map<String, String> hostProperties = new HashMap<>();
 
     /**
@@ -237,5 +243,13 @@ public class HostInfo implements DatabaseUrlContainer {
         StringBuilder asStr = new StringBuilder(super.toString());
         asStr.append(String.format(" :: {host: \"%s\", port: %d, hostProperties: %s}", this.host, this.port, this.hostProperties));
         return asStr.toString();
+    }
+
+    public Ticdc getTicdc() {
+        return ticdc;
+    }
+
+    public void setTicdc(Ticdc ticdc) {
+        this.ticdc = ticdc;
     }
 }

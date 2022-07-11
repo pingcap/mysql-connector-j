@@ -32,10 +32,14 @@ package com.mysql.cj.jdbc;
 import static com.mysql.cj.util.StringUtils.isNullOrEmpty;
 
 import java.sql.DriverPropertyInfo;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 import com.mysql.cj.Constants;
@@ -52,6 +56,8 @@ import com.mysql.cj.jdbc.ha.FailoverConnectionProxy;
 import com.mysql.cj.jdbc.ha.LoadBalancedConnectionProxy;
 import com.mysql.cj.jdbc.ha.ReplicationConnectionProxy;
 import com.mysql.cj.util.StringUtils;
+import com.tidb.snapshot.Monitor;
+import com.tidb.snapshot.Ticdc;
 
 /**
  * The Java SQL framework allows for multiple database drivers. Each driver should supply a class that implements the Driver interface
@@ -72,6 +78,9 @@ import com.mysql.cj.util.StringUtils;
  * </p>
  */
 public class NonRegisteringDriver implements java.sql.Driver {
+
+
+    private Monitor monitor;
 
     /*
      * Standardizes OS name information to align with other drivers/clients
@@ -127,6 +136,7 @@ public class NonRegisteringDriver implements java.sql.Driver {
      */
     public NonRegisteringDriver() throws SQLException {
         // Required for Class.forName().newInstance()
+        monitor = Monitor.of(this);
     }
 
     /**
@@ -191,8 +201,9 @@ public class NonRegisteringDriver implements java.sql.Driver {
                  */
                 return null;
             }
-
+            Ticdc ticdc = monitor.setInfo(url,info).get();
             ConnectionUrl conStr = ConnectionUrl.getConnectionUrlInstance(url, info);
+            conStr.getMainHost().setTicdc(ticdc);
             switch (conStr.getType()) {
                 case SINGLE_CONNECTION:
                     return com.mysql.cj.jdbc.ConnectionImpl.getInstance(conStr.getMainHost());

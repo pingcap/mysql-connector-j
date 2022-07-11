@@ -873,7 +873,8 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
             boolean queryIsSelectOnly, ColumnDefinition metadata, boolean isBatch) throws SQLException {
         synchronized (checkClosed().getConnectionMutex()) {
             try {
-                this.connection.refreshSnapshot();
+
+                // TODO this.connection.refreshSnapshot();
                 JdbcConnection locallyScopedConnection = this.connection;
 
                 ((PreparedQuery) this.query).getQueryBindings()
@@ -921,7 +922,7 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
         synchronized (checkClosed().getConnectionMutex()) {
 
             JdbcConnection locallyScopedConn = this.connection;
-            this.connection.refreshSnapshot();
+            // TODO this.connection.refreshSnapshot();
             if (!this.doPingInstead) {
                 QueryReturnType queryReturnType = getQueryInfo().getQueryReturnType();
                 if (queryReturnType != QueryReturnType.PRODUCES_RESULT_SET && queryReturnType != QueryReturnType.MAY_PRODUCE_RESULT_SET) {

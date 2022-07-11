@@ -46,9 +46,6 @@ import java.util.Random;
 import java.util.Stack;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -92,6 +89,7 @@ import com.mysql.cj.protocol.SocksProxySocketFactory;
 import com.mysql.cj.util.LRUCache;
 import com.mysql.cj.util.StringUtils;
 import com.mysql.cj.util.Util;
+import com.tidb.snapshot.Ticdc;
 
 /**
  * A Connection represents a session with a specific database. Within the context of a Connection, SQL statements are executed and results are returned.
@@ -119,9 +117,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
     private static final SQLPermission ABORT_PERM = new SQLPermission("abort");
 
-    private final AtomicLong ticdcACIDinitValue = new AtomicLong(0);
+    private AtomicLong secondaryTs = new AtomicLong(0);
 
-    private StatementImpl stmt;
+    private Ticdc ticdc;
 
     @Override
     public String getHost() {
@@ -144,6 +142,14 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         }
         this.topProxy = proxy;
         this.realProxy = this.topProxy instanceof MultiHostMySQLConnection ? ((MultiHostMySQLConnection) proxy).getThisAsProxy() : null;
+    }
+
+    public void setSecondaryTs(Long secondaryTs){
+        this.secondaryTs.set(secondaryTs);
+    }
+
+    public Long getSecondaryTs(){
+        return secondaryTs.get();
     }
 
     // this connection has to be proxied when using multi-host settings so that statements get routed to the right physical connection
@@ -385,6 +391,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     public ConnectionImpl(HostInfo hostInfo) throws SQLException {
 
         try {
+            this.ticdc = hostInfo.getTicdc();
             // Stash away for later, used to clone this connection for Statement.cancel and Statement.setQueryTimeout().
             this.origHostInfo = hostInfo;
             this.origHostToConnectTo = hostInfo.getHost();
@@ -769,81 +776,6 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         }
     }
 
-    private String getTidbSnapshotParameter(String key,String defaultValue){
-        String value = this.props.getProperty(key);
-        if(value == null){
-            value = defaultValue;
-        }
-        return value;
-    }
-
-    public String buildTidbSnapshotSql(){
-        String ticdcCFname = getTidbSnapshotParameter(TIDB_TICDC_CF_NAME_KEY,null);
-        if(ticdcCFname == null){
-            return null;
-        }
-        String sql = null;
-        if(ticdcCFname != null){
-            sql = QUERY_TIDB_SNAPSHOT_SQL.replace("{ticdcCFname}",ticdcCFname);
-        }
-        return sql;
-    }
-
-    public void refreshSnapshot(){
-        String useTicdcACID = getTidbSnapshotParameter(TIDB_USE_TICDC_ACID_KEY,null);
-        if(useTicdcACID == null){
-            return;
-        }
-        if(!"true".equals(useTicdcACID)){
-            return;
-        }
-        String sql = buildTidbSnapshotSql();
-        if(sql == null){
-            return;
-        }
-        String ticdcACIDInterval = getTidbSnapshotParameter(TIDB_TICDC_ACID_INTERVAL_KEY,"300000");
-        long setSnapshotTime = System.currentTimeMillis();
-        //System.out.println("Snapshot-tidb_snapshot-timeout:"+(setSnapshotTime - ticdcACIDinitValue.get() - Long.parseLong(ticdcACIDInterval)));
-        try {
-            /*
-             * init setSnapshot
-             * */
-            if(ticdcACIDinitValue.get() == 0){
-                setSnapshot(true,sql);
-                ticdcACIDinitValue.set(System.currentTimeMillis());
-            }else if(setSnapshotTime - ticdcACIDinitValue.get() > Long.parseLong(ticdcACIDInterval)){
-                /*
-                 *  long connection setSnapshot
-                 * */
-                setSnapshot(false, sql);
-                ticdcACIDinitValue.set(System.currentTimeMillis());
-            }
-        }catch (SQLException e){
-
-        }
-
-    }
-
-
-    public void setSnapshot(Boolean init,String sql) throws SQLException{
-        if(!init){
-            this.session.setSnapshot("");
-            //String tidb_snapshot = this.session.queryServerVariable("@@tidb_snapshot");
-            //System.out.println("Snapshot-tidb_snapshot-set empty:"+tidb_snapshot);
-        }
-        try (final ResultSet resultSet = this.stmt.executeQuery(sql)) {
-            while (resultSet.next()) {
-                final String secondaryTs = resultSet.getString("secondary_ts");
-                //System.out.println("Snapshot-tidb_snapshot-db:"+secondaryTs);
-                if(secondaryTs != null){
-                    this.session.setSnapshot(secondaryTs);
-                    //String tidb_snapshot = this.session.queryServerVariable("@@tidb_snapshot");
-                    //System.out.println("Snapshot-tidb_snapshot-queryServerVariable:"+tidb_snapshot);
-                }
-            }
-        }
-    }
-
     @Override
     public void commit() throws SQLException {
         synchronized (getConnectionMutex()) {
@@ -1175,9 +1107,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         StatementImpl stmt = new StatementImpl(getMultiHostSafeProxy(), this.database);
         stmt.setResultSetType(resultSetType);
         stmt.setResultSetConcurrency(resultSetConcurrency);
-        this.stmt = stmt;
-        //refreshSnapshot();
-        return stmt;
+        StatementProxy proxy = new StatementProxy(this,stmt,ticdc);
+        return proxy;
     }
 
     @Override
@@ -1729,9 +1660,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             } else {
                 pStmt = (ClientPreparedStatement) clientPrepareStatement(nativeSql, resultSetType, resultSetConcurrency, false);
             }
-            this.stmt = pStmt;
-            //refreshSnapshot();
-            return pStmt;
+
+            PreparedStatementProxy proxy = new PreparedStatementProxy(this,pStmt,ticdc);
+            return proxy;
         }
     }
 

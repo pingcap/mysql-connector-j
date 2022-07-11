@@ -652,7 +652,7 @@ public class StatementImpl implements JdbcStatement {
         JdbcConnection locallyScopedConn = checkClosed();
 
         synchronized (locallyScopedConn.getConnectionMutex()) {
-            this.connection.refreshSnapshot();
+            // TODO this.connection.refreshSnapshot();
             checkClosed();
 
             checkNullOrEmptyQuery(sql);
@@ -800,7 +800,7 @@ public class StatementImpl implements JdbcStatement {
         JdbcConnection locallyScopedConn = checkClosed();
 
         synchronized (locallyScopedConn.getConnectionMutex()) {
-            this.connection.refreshSnapshot();
+            // TODO  this.connection.refreshSnapshot();
             if (locallyScopedConn.isReadOnly()) {
                 throw SQLError.createSQLException(Messages.getString("Statement.34") + Messages.getString("Statement.35"),
                         MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, getExceptionInterceptor());
@@ -1107,9 +1107,9 @@ public class StatementImpl implements JdbcStatement {
     public java.sql.ResultSet executeQuery(String sql) throws SQLException {
         synchronized (checkClosed().getConnectionMutex()) {
             JdbcConnection locallyScopedConn = this.connection;
-            if(!sql.contains("`tidb_cdc`.`syncpoint_v1`")){
+            /*** TODO if(!sql.contains("`tidb_cdc`.`syncpoint_v1`")){
                 this.connection.refreshSnapshot();
-            }
+            }**/
             this.retrieveGeneratedKeys = false;
 
             checkNullOrEmptyQuery(sql);
@@ -1253,7 +1253,7 @@ public class StatementImpl implements JdbcStatement {
     protected long executeUpdateInternal(String sql, boolean isBatch, boolean returnGeneratedKeys) throws SQLException {
         synchronized (checkClosed().getConnectionMutex()) {
             JdbcConnection locallyScopedConn = this.connection;
-            this.connection.refreshSnapshot();
+            //TODO this.connection.refreshSnapshot();
             checkNullOrEmptyQuery(sql);
 
             resetCancelledState();
