@@ -3,6 +3,7 @@ package com.tidb.jdbc;
 import com.mysql.cj.jdbc.ConnectionImpl;
 import com.tidb.snapshot.Ticdc;
 
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -14,7 +15,7 @@ public class TidbCdcOperate {
     private static final String TIDB_TICDC_CF_NAME_KEY = "ticdcCFname";
 
     private static final String QUERY_TIDB_SNAPSHOT_SQL =
-            "select `secondary_ts` from `tidb_cdc`.`syncpoint_v1` where `cf` = \"{ticdcCFname}\" order by `primary_ts` desc limit 1";
+            "select `secondary_ts` from `tidb_cdc`.`syncpoint_v1` where `cf` = ? order by `primary_ts` desc limit 1";
 
 
     public ConnectionImpl connection;
@@ -80,12 +81,13 @@ public class TidbCdcOperate {
     }
 
     public String getSnapshot() throws SQLException{
-        String sql = buildTidbSnapshotSql();
-        if(sql == null){
+        String ticdcCFname = getTidbSnapshotParameter(TIDB_TICDC_CF_NAME_KEY,null);
+        if(ticdcCFname == null){
             return null;
         }
-        Statement statement =this.connection.createStatement();
-        try (final ResultSet resultSet = statement.executeQuery(sql)) {
+        try (PreparedStatement ps = this.connection.prepareStatement(QUERY_TIDB_SNAPSHOT_SQL)){
+            ps.setString(1,ticdcCFname);
+            ResultSet resultSet = ps.executeQuery();
             while (resultSet.next()) {
                 final String secondaryTs = resultSet.getString("secondary_ts");
                 if(secondaryTs != null){
@@ -94,17 +96,5 @@ public class TidbCdcOperate {
             }
         }
         return null;
-    }
-
-    public String buildTidbSnapshotSql(){
-        String ticdcCFname = getTidbSnapshotParameter(TIDB_TICDC_CF_NAME_KEY,null);
-        if(ticdcCFname == null){
-            return null;
-        }
-        String sql = null;
-        if(ticdcCFname != null){
-            sql = QUERY_TIDB_SNAPSHOT_SQL.replace("{ticdcCFname}",ticdcCFname);
-        }
-        return sql;
     }
 }
