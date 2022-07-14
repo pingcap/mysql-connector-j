@@ -75,6 +75,8 @@ public class Monitor {
 
     private static final String TIDB_TICDC_ACID_INTERVAL_KEY = "ticdcACIDInterval";
 
+    private static final String TIDB_USE_TICDC_ACID_KEY = "useTicdcACID";
+
     private AtomicLong ticdcACIDInterval = new AtomicLong(100);
 
 
@@ -131,6 +133,13 @@ public class Monitor {
      * create ScheduledThreadPoolExecutor get  SecondaryTs value
      */
     public void createExecutor(){
+        String useTicdcACID = properties.getProperty(TIDB_USE_TICDC_ACID_KEY);
+        if(useTicdcACID == null){
+            return;
+        }
+        if(!"true".equals(useTicdcACID)){
+            return;
+        }
         if(this.executor != null){
             return;
         }
