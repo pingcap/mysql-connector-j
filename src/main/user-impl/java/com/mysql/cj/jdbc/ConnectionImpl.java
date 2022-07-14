@@ -103,16 +103,6 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
     private static final long serialVersionUID = 4009476458425101761L;
 
-    private static final String TIDB_USE_TICDC_ACID_KEY = "useTicdcACID";
-
-    private static final String TIDB_TICDC_CF_NAME_KEY = "ticdcCFname";
-
-    private static final String TIDB_TICDC_ACID_INTERVAL_KEY = "ticdcACIDInterval";
-
-    private static final String QUERY_TIDB_SNAPSHOT_SQL =
-            "select `secondary_ts` from `tidb_cdc`.`syncpoint_v1` where `cf` = \"{ticdcCFname}\" order by `primary_ts` desc limit 1";
-
-
     private static final SQLPermission SET_NETWORK_TIMEOUT_PERM = new SQLPermission("setNetworkTimeout");
 
     private static final SQLPermission ABORT_PERM = new SQLPermission("abort");

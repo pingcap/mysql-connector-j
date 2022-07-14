@@ -1,3 +1,32 @@
+/*
+ * Copyright (c) 2002, 2020, Oracle and/or its affiliates.
+ *
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License, version 2.0, as published by the
+ * Free Software Foundation.
+ *
+ * This program is also distributed with certain software (including but not
+ * limited to OpenSSL) that is licensed under separate terms, as designated in a
+ * particular file or component or in included license documentation. The
+ * authors of MySQL hereby grant you an additional permission to link the
+ * program and your derivative works with the separately licensed software that
+ * they have included with MySQL.
+ *
+ * Without limiting anything contained in the foregoing, this file, which is
+ * part of MySQL Connector/J, is also subject to the Universal FOSS Exception,
+ * version 1.0, a copy of which can be found at
+ * http://oss.oracle.com/licenses/universal-foss-exception.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU General Public License, version 2.0,
+ * for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
+ */
+
 package com.tidb.jdbc;
 
 import com.mysql.cj.jdbc.ConnectionImpl;
@@ -6,8 +35,11 @@ import com.tidb.snapshot.Ticdc;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
+import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ *
+ */
 public class TidbCdcOperate {
 
     private static final String TIDB_USE_TICDC_ACID_KEY = "useTicdcACID";
@@ -21,6 +53,10 @@ public class TidbCdcOperate {
     public ConnectionImpl connection;
 
     public Ticdc ticdc;
+
+    private AtomicReference<PreparedStatement> preparedStatement;
+
+    private Boolean closeFlag = true;
 
     public TidbCdcOperate(ConnectionImpl connection,Ticdc ticdc){
         this.connection = connection;
@@ -40,13 +76,19 @@ public class TidbCdcOperate {
             return this;
         }
         try {
-            if(connection != null){
+            if(this.connection != null){
                 setSnapshot();
             }
 
         }catch (SQLException e){
             System.out.println("refreshSnapshot error:"+e.getMessage());
         }
+        return this;
+    }
+
+    public TidbCdcOperate setPreparedStatement(AtomicReference<PreparedStatement> preparedStatement){
+        this.preparedStatement = preparedStatement;
+        this.closeFlag = false;
         return this;
     }
 
@@ -80,19 +122,41 @@ public class TidbCdcOperate {
         return this;
     }
 
+    /**
+     *
+     * monitor reuse use preparedStatement
+     * use conn create preparedStatement
+     * @return getSnapshot
+     * @throws SQLException
+     */
     public String getSnapshot() throws SQLException{
         String ticdcCFname = getTidbSnapshotParameter(TIDB_TICDC_CF_NAME_KEY,null);
         if(ticdcCFname == null){
             return null;
         }
-        try (PreparedStatement ps = this.connection.prepareStatement(QUERY_TIDB_SNAPSHOT_SQL)){
-            ps.setString(1,ticdcCFname);
-            ResultSet resultSet = ps.executeQuery();
+        ResultSet resultSet = null;
+        try {
+            if(this.preparedStatement == null){
+                this.preparedStatement = new AtomicReference<>();
+            }
+            if(this.preparedStatement.get() == null){
+                this.preparedStatement.set(this.connection.prepareStatement(QUERY_TIDB_SNAPSHOT_SQL));
+            }
+            this.preparedStatement.get().setString(1,ticdcCFname);
+            resultSet = this.preparedStatement.get().executeQuery();
             while (resultSet.next()) {
                 final String secondaryTs = resultSet.getString("secondary_ts");
                 if(secondaryTs != null){
                     return secondaryTs;
                 }
+            }
+        }catch (SQLException e){}
+        finally {
+            if(closeFlag){
+                this.preparedStatement.get().close();
+            }
+            if(resultSet != null){
+                resultSet.close();
             }
         }
         return null;
