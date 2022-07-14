@@ -84,13 +84,7 @@ public class Monitor {
         return ticdc;
     }
 
-    public void reload(){
-        if(this.url == null){
-            return;
-        }
-        if("".equals(this.url)){
-            return;
-        }
+    private void connect(){
         try {
             if(this.conn.get() == null){
                 if(connLock.tryLock()){
@@ -98,9 +92,14 @@ public class Monitor {
                     connLock.unlock();
                 }
             }
-            if(this.conn.get() == null){
-                return;
-            }
+        }catch (SQLException e) {
+            connLock.unlock();
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void setGlobalSecondaryTs(){
+        try {
             String secondaryTs = TidbCdcOperate.of((ConnectionImpl) conn.get(),ticdc).getSnapshot();
             if(secondaryTs != null){
                 Long secondaryTsValue = Long.parseLong(secondaryTs);
@@ -112,5 +111,19 @@ public class Monitor {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void reload(){
+        if(this.url == null){
+            return;
+        }
+        if("".equals(this.url)){
+            return;
+        }
+        connect();
+        if(this.conn.get() == null){
+            return;
+        }
+        setGlobalSecondaryTs();
     }
 }
