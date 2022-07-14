@@ -52,7 +52,7 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  */
 public class Monitor {
-    private Ticdc ticdc = new Ticdc();
+    private final Ticdc ticdc = new Ticdc();
 
     private String url;
 
@@ -68,8 +68,7 @@ public class Monitor {
 
     private Properties properties;
 
-
-    private Lock connLock = new ReentrantLock();
+    private final Lock connLock = new ReentrantLock();
 
     private static final AtomicInteger threadId = new AtomicInteger();
 
@@ -77,7 +76,7 @@ public class Monitor {
 
     private static final String TIDB_USE_TICDC_ACID_KEY = "useTicdcACID";
 
-    private AtomicLong ticdcACIDInterval = new AtomicLong(100);
+    private final AtomicLong ticdcACIDInterval = new AtomicLong(100);
 
 
     public Monitor(Driver driver,String url,Properties info,ScheduledThreadPoolExecutor executor){
@@ -125,8 +124,16 @@ public class Monitor {
      * parser url properties
      */
     private void parser(){
-        ConnectionUrl connStr = ConnectionUrl.getConnectionUrlInstance(this.url, this.info);
-        this.properties = connStr.getConnectionArgumentsAsProperties();
+        if(ConnectionUrl.acceptsUrl(this.url)){
+            ConnectionUrl connStr = ConnectionUrl.getConnectionUrlInstance(this.url, this.info);
+            this.properties = connStr.getConnectionArgumentsAsProperties();
+        }
+    }
+
+    class ErrHandler implements Thread.UncaughtExceptionHandler {
+        public void uncaughtException(Thread a, Throwable e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -155,12 +162,14 @@ public class Monitor {
                             Thread newThread = new Thread(runnable);
                             newThread.setName(executorName);
                             newThread.setDaemon(true);
+                            newThread.setUncaughtExceptionHandler(new ErrHandler());
                             return newThread;
                         });
         this.executor.setKeepAliveTime(ticdcACIDInterval.get(), TimeUnit.MILLISECONDS);
         this.executor.allowCoreThreadTimeOut(true);
         this.executor.scheduleWithFixedDelay(
                 this::reload, 0, ticdcACIDInterval.get(), TimeUnit.MILLISECONDS);
+
     }
 
     public Ticdc get(){
@@ -197,6 +206,8 @@ public class Monitor {
                     this.ticdc.getGlobalSecondaryTs().set(Long.parseLong(secondaryTs));
                     this.ticdc.getGloballasttime().set(System.currentTimeMillis());
                 }
+            }else {
+                throw new RuntimeException("secondaryTs is null");
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -213,11 +224,16 @@ public class Monitor {
         if("".equals(this.url)){
             return;
         }
-        connect();
-        if(this.conn.get() == null){
-            return;
+        try {
+            connect();
+            if(this.conn.get() == null){
+                return;
+            }
+            setGlobalSecondaryTs();
+        } catch (Exception e){
+            throw new RuntimeException(e);
         }
-        setGlobalSecondaryTs();
+
     }
 
 

@@ -73,7 +73,7 @@ public class TidbCdcOperate {
      *
      * @return
      */
-    public TidbCdcOperate refreshSnapshot(){
+    public TidbCdcOperate refreshSnapshot() throws Exception{
         String useTicdcACID = getTidbSnapshotParameter(TIDB_USE_TICDC_ACID_KEY,null);
         if(useTicdcACID == null){
             return this;
@@ -87,7 +87,8 @@ public class TidbCdcOperate {
             }
 
         }catch (SQLException e){
-            System.out.println("refreshSnapshot error:"+e.getMessage());
+            System.out.println("ticdc-refreshSnapshot:"+e);
+            throw new RuntimeException(e);
         }
         return this;
     }
@@ -117,9 +118,10 @@ public class TidbCdcOperate {
      * @throws SQLException
      */
     public TidbCdcOperate setSnapshot() throws SQLException{
-        if(this.ticdc.getGlobalSecondaryTs().get() == 0){
-            return this;
-        }
+//        if(this.ticdc.getGlobalSecondaryTs().get() == 0){
+//            return this;
+//        }
+
         if(this.connection.getSecondaryTs() == 0){
             this.connection.getSession().setSnapshot("");
             String secondaryTs = getSnapshot();
@@ -163,15 +165,18 @@ public class TidbCdcOperate {
                     return secondaryTs;
                 }
             }
-        }catch (SQLException e){}
-        finally {
+            throw new SQLException("secondary_ts is empty");
+        } catch (SQLException e){
+            throw new SQLException(e);
+        } finally {
             if(closeFlag){
-                this.preparedStatement.get().close();
+                if(preparedStatement != null){
+                    this.preparedStatement.get().close();
+                }
             }
             if(resultSet != null){
                 resultSet.close();
             }
         }
-        return null;
     }
 }

@@ -10,6 +10,11 @@ public class TidbCdcWrapper {
     public Ticdc ticdc;
 
     public void refreshSnapshot(){
-        TidbCdcOperate.of(connection,ticdc).refreshSnapshot();
+        try {
+            TidbCdcOperate.of(connection,ticdc).refreshSnapshot();
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+
     }
 }
