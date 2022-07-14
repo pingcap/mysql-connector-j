@@ -67,6 +67,12 @@ public class TidbCdcOperate {
         return new TidbCdcOperate(connection,ticdc);
     }
 
+    /**
+     *
+     * proxy refresh connection Snapshot
+     *
+     * @return
+     */
     public TidbCdcOperate refreshSnapshot(){
         String useTicdcACID = getTidbSnapshotParameter(TIDB_USE_TICDC_ACID_KEY,null);
         if(useTicdcACID == null){
@@ -103,6 +109,13 @@ public class TidbCdcOperate {
         return value;
     }
 
+    /**
+     *
+     * set connection SecondaryTs and Session() SecondaryTs by GlobalSecondaryTs
+     * if GlobalSecondaryTs is null get SecondaryTs by db
+     * @return
+     * @throws SQLException
+     */
     public TidbCdcOperate setSnapshot() throws SQLException{
         if(this.ticdc.getGlobalSecondaryTs().get() == 0){
             return this;
