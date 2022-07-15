@@ -29,7 +29,7 @@ public class PreparedStatementProxy extends TidbCdcWrapper implements PreparedSt
 
     @Override
     public ResultSet executeQuery() throws SQLException {
-        String sql = ((ServerPreparedStatement) this.preparedStatement).getPreparedSql();
+        String sql = ((ClientPreparedStatement) this.preparedStatement).getPreparedSql();
         if(!sql.contains("`tidb_cdc`.`syncpoint_v1`")){
             refreshSnapshot();
         }
@@ -143,7 +143,7 @@ public class PreparedStatementProxy extends TidbCdcWrapper implements PreparedSt
 
     @Override
     public boolean execute() throws SQLException {
-        String sql = ((ServerPreparedStatement) this.preparedStatement).getPreparedSql();
+        String sql = ((ClientPreparedStatement) this.preparedStatement).getPreparedSql();
         if(!sql.contains("`tidb_cdc`.`syncpoint_v1`")){
             refreshSnapshot();
         }

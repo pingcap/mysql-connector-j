@@ -110,6 +110,11 @@ public class TidbCdcOperate {
         return value;
     }
 
+    private void setConnectionSnapshot(Long secondaryTs){
+        this.connection.getSession().setSnapshot(secondaryTs+"");
+        this.connection.setSecondaryTs(secondaryTs);
+    }
+
     /**
      *
      * set connection SecondaryTs and Session() SecondaryTs by GlobalSecondaryTs
@@ -118,22 +123,32 @@ public class TidbCdcOperate {
      * @throws SQLException
      */
     public TidbCdcOperate setSnapshot() throws SQLException{
-//        if(this.ticdc.getGlobalSecondaryTs().get() == 0){
-//            return this;
-//        }
-
         if(this.connection.getSecondaryTs() == 0){
-            this.connection.getSession().setSnapshot("");
+            //this.connection.getSession().setSnapshot("");
             String secondaryTs = getSnapshot();
             if(secondaryTs != null){
                 Long secondaryTsValue = Long.parseLong(secondaryTs);
-                this.connection.setSecondaryTs(secondaryTsValue);
-                this.connection.getSession().setSnapshot(secondaryTs);
+                setConnectionSnapshot(secondaryTsValue);
             }
-        }else if(this.ticdc.getGlobalSecondaryTs().get() != 0 && this.connection.getSecondaryTs() != this.ticdc.getGlobalSecondaryTs().get()){
-            this.connection.getSession().setSnapshot(this.ticdc.getGlobalSecondaryTs().get()+"");
-            this.connection.setSecondaryTs(this.ticdc.getGlobalSecondaryTs().get());
+            return this;
+       }
+        if(this.ticdc.getGlobalSecondaryTs().get() == 0){
+            return this;
         }
+        if(this.connection.getSecondaryTs() == this.ticdc.getGlobalSecondaryTs().get()){
+            return this;
+        }
+
+//        if(this.connection.getSecondaryTs() == 0){
+//            this.connection.getSession().setSnapshot("");
+//            String secondaryTs = getSnapshot();
+//            if(secondaryTs != null){
+//                Long secondaryTsValue = Long.parseLong(secondaryTs);
+//                this.connection.setSecondaryTs(secondaryTsValue);
+//                this.connection.getSession().setSnapshot(secondaryTs);
+//            }
+//        }else
+        setConnectionSnapshot(this.ticdc.getGlobalSecondaryTs().get());
         return this;
     }
 
