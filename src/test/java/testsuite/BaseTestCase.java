@@ -144,7 +144,7 @@ public abstract class BaseTestCase {
         this.myInstanceNumber = instanceCount++;
 
         String newDbUrl = System.getProperty(PropertyDefinitions.SYSP_testsuite_url);
-
+        //newDbUrl = "jdbc:mysql://172.16.4.145:4000/banktest?user=root&password=&useUnicode=true&characterEncoding=UTF-8&useServerPrepStmts=true&useSSL=false&rewriteBatchedStatements=true";
         if ((newDbUrl != null) && (newDbUrl.trim().length() != 0)) {
             dbUrl = sanitizeDbName(newDbUrl);
         }
@@ -664,12 +664,18 @@ public abstract class BaseTestCase {
                 // ensure max_connections value is enough to run tests
                 this.rs.close();
                 this.rs = this.stmt.executeQuery("SHOW VARIABLES LIKE 'max_connections'");
-                this.rs.next();
-                int maxConnections = this.rs.getInt(2);
+                int maxConnections = 0;
+                if (this.rs.next()) {
+                    maxConnections = this.rs.getInt(2);
+                }
 
+                this.rs.close();
                 this.rs = this.stmt.executeQuery("show status like 'threads_connected'");
-                this.rs.next();
-                int usedConnections = this.rs.getInt(2);
+                int usedConnections = 0;
+                if (this.rs.next()) {
+                    usedConnections = this.rs.getInt(2);
+                }
+
 
                 if (maxConnections - usedConnections < 200) {
                     this.stmt.executeUpdate("SET GLOBAL max_connections=" + (maxConnections + 200));

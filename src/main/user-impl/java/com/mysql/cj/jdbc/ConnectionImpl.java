@@ -89,6 +89,7 @@ import com.mysql.cj.protocol.SocksProxySocketFactory;
 import com.mysql.cj.util.LRUCache;
 import com.mysql.cj.util.StringUtils;
 import com.mysql.cj.util.Util;
+import com.tidb.jdbc.TidbCdcOperate;
 import com.tidb.snapshot.Ticdc;
 
 /**
@@ -140,6 +141,15 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
     public Long getSecondaryTs(){
         return secondaryTs.get();
+    }
+
+    public void refreshSnapshot(){
+        try {
+            TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+
     }
 
     // this connection has to be proxied when using multi-host settings so that statements get routed to the right physical connection
@@ -445,7 +455,6 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             }
 
             this.dbmd = getMetaData(false, false);
-            //ticdcACIDinitValue.set(System.currentTimeMillis());
             initializeSafeQueryInterceptors();
 
 
@@ -1097,8 +1106,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         StatementImpl stmt = new StatementImpl(getMultiHostSafeProxy(), this.database);
         stmt.setResultSetType(resultSetType);
         stmt.setResultSetConcurrency(resultSetConcurrency);
-        StatementProxy proxy = new StatementProxy(this,stmt,ticdc);
-        return proxy;
+        //StatementProxy proxy = new StatementProxy(this,stmt,ticdc);
+        return stmt;
     }
 
     @Override
@@ -1650,8 +1659,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             } else {
                 pStmt = (ClientPreparedStatement) clientPrepareStatement(nativeSql, resultSetType, resultSetConcurrency, false);
             }
-            PreparedStatementProxy proxy = new PreparedStatementProxy(this,pStmt,ticdc);
-            return proxy;
+            //PreparedStatementProxy proxy = new PreparedStatementProxy(this,pStmt,ticdc);
+            return pStmt;
         }
     }
 
