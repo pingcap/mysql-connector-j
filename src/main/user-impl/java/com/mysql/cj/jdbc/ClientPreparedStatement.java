@@ -874,9 +874,7 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
         synchronized (checkClosed().getConnectionMutex()) {
             try {
                 String sql = getPreparedSql();
-                if(!sql.contains("`tidb_cdc`.`syncpoint_v1`")){
-                    this.connection.refreshSnapshot();
-                }
+                this.connection.refreshSnapshot(sql);
                 JdbcConnection locallyScopedConnection = this.connection;
 
                 ((PreparedQuery) this.query).getQueryBindings()
@@ -925,9 +923,8 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
 
             JdbcConnection locallyScopedConn = this.connection;
             String sql = getPreparedSql();
-            if(!sql.contains("`tidb_cdc`.`syncpoint_v1`")){
-                this.connection.refreshSnapshot();
-            }
+            this.connection.refreshSnapshot(sql);
+
             if (!this.doPingInstead) {
                 QueryReturnType queryReturnType = getQueryInfo().getQueryReturnType();
                 if (queryReturnType != QueryReturnType.PRODUCES_RESULT_SET && queryReturnType != QueryReturnType.MAY_PRODUCE_RESULT_SET) {

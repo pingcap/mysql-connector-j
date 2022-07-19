@@ -76,8 +76,16 @@ public class Monitor {
 
     private static final String TIDB_USE_TICDC_ACID_KEY = "useTicdcACID";
 
+    private static final String TIDB_TICDC_CF_NAME_KEY = "ticdcCFname";
+
     private final AtomicLong ticdcACIDInterval = new AtomicLong(100);
 
+
+    private String ticdcCFname;
+
+    private String ticdcACIDIntervalValue;
+
+    private String useTicdcACID;
 
     public Monitor(Driver driver,String url,Properties info,ScheduledThreadPoolExecutor executor){
         this.driver = driver;
@@ -103,6 +111,7 @@ public class Monitor {
         this.url = url;
         this.info = info;
         parser();
+
         createExecutor();
         registerDestroy();
         return this;
@@ -127,7 +136,34 @@ public class Monitor {
         if(ConnectionUrl.acceptsUrl(this.url)){
             ConnectionUrl connStr = ConnectionUrl.getConnectionUrlInstance(this.url, this.info);
             this.properties = connStr.getConnectionArgumentsAsProperties();
+
+            this.ticdcCFname = properties.getProperty(TIDB_TICDC_CF_NAME_KEY);
+            this.ticdcACIDIntervalValue = properties.getProperty(TIDB_TICDC_ACID_INTERVAL_KEY);
+            this.useTicdcACID = properties.getProperty(TIDB_USE_TICDC_ACID_KEY);
+
+            if(this.ticdcACIDIntervalValue != null){
+                ticdcACIDInterval.set(Long.parseLong(this.ticdcACIDIntervalValue));
+            }
+
+            if(this.ticdcCFname != null){
+                ticdc.setTicdcCFname(this.ticdcCFname);
+            }
+
+            if(this.useTicdcACID != null){
+                this.ticdc.setUseTicdcACID(this.useTicdcACID);
+            }
+            System.out.println("ticdc-parser,ticdcCFname:"+ticdcCFname+",ticdcACIDIntervalValue:"+ticdcACIDIntervalValue+",useTicdcACID:"+useTicdcACID);
         }
+    }
+
+    private Boolean isRun(){
+        if(this.useTicdcACID == null){
+            return false;
+        }
+        if(!"true".equals(this.useTicdcACID)){
+            return false;
+        }
+        return true;
     }
 
     class ErrHandler implements Thread.UncaughtExceptionHandler {
@@ -140,19 +176,12 @@ public class Monitor {
      * create ScheduledThreadPoolExecutor get  SecondaryTs value
      */
     public void createExecutor(){
-        String useTicdcACID = properties.getProperty(TIDB_USE_TICDC_ACID_KEY);
-        if(useTicdcACID == null){
+        if(!isRun()){
             return;
         }
-        if(!"true".equals(useTicdcACID)){
-            return;
-        }
+
         if(this.executor != null){
             return;
-        }
-        String confTicdcACIDInterval = properties.getProperty(TIDB_TICDC_ACID_INTERVAL_KEY);
-        if(confTicdcACIDInterval != null){
-            ticdcACIDInterval.set(Long.parseLong(confTicdcACIDInterval));
         }
         String executorName = "reload-Thread-" + threadId.getAndIncrement();
         this.executor =
@@ -181,6 +210,12 @@ public class Monitor {
      * concurrency create add lock
      */
     private void connect(){
+        if(this.url == null){
+            return;
+        }
+        if("".equals(this.url)){
+            return;
+        }
         try {
             if(this.conn.get() == null){
                 if(connLock.tryLock()){
@@ -218,22 +253,15 @@ public class Monitor {
      * monitor get SecondaryTs and set Global SecondaryTs
      */
     public void reload(){
-        if(this.url == null){
-            return;
-        }
-        if("".equals(this.url)){
+        connect();
+        if(this.conn.get() == null){
             return;
         }
         try {
-            connect();
-            if(this.conn.get() == null){
-                return;
-            }
             setGlobalSecondaryTs();
         } catch (Exception e){
             throw new RuntimeException(e);
         }
-
     }
 
 

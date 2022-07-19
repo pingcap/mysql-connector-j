@@ -42,13 +42,11 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class TidbCdcOperate {
 
-    private static final String TIDB_USE_TICDC_ACID_KEY = "useTicdcACID";
-
-    private static final String TIDB_TICDC_CF_NAME_KEY = "ticdcCFname";
-
     private static final String QUERY_TIDB_SNAPSHOT_SQL =
             "select `secondary_ts` from `tidb_cdc`.`syncpoint_v1` where `cf` = ? order by `primary_ts` desc limit 1";
 
+
+    private static final String QUERY_CFNAME_SQL = "select cf from `tidb_cdc`.`syncpoint_v1` group by cf";
 
     public ConnectionImpl connection;
 
@@ -67,6 +65,19 @@ public class TidbCdcOperate {
         return new TidbCdcOperate(connection,ticdc);
     }
 
+
+
+    private Boolean isRun(){
+        String useTicdcACID = this.ticdc.getUseTicdcACID();
+        if(useTicdcACID == null){
+            return false;
+        }
+        if(!"true".equals(useTicdcACID)){
+            return false;
+        }
+        return true;
+    }
+
     /**
      *
      * proxy refresh connection Snapshot
@@ -74,11 +85,7 @@ public class TidbCdcOperate {
      * @return
      */
     public TidbCdcOperate refreshSnapshot() throws Exception{
-        String useTicdcACID = getTidbSnapshotParameter(TIDB_USE_TICDC_ACID_KEY,null);
-        if(useTicdcACID == null){
-            return this;
-        }
-        if(!"true".equals(useTicdcACID)){
+        if(!isRun()){
             return this;
         }
         try {
@@ -99,20 +106,10 @@ public class TidbCdcOperate {
         return this;
     }
 
-    private String getTidbSnapshotParameter(String key,String defaultValue){
-        if(connection == null){
-            return defaultValue;
-        }
-        String value = this.connection.getProperties().getProperty(key);
-        if(value == null){
-            value = defaultValue;
-        }
-        return value;
-    }
-
     private void setConnectionSnapshot(Long secondaryTs){
         this.connection.getSession().setSnapshot(secondaryTs+"");
         this.connection.setSecondaryTs(secondaryTs);
+        System.out.println("ticdc-setConnectionSnapshot:"+secondaryTs);
     }
 
     /**
@@ -160,23 +157,21 @@ public class TidbCdcOperate {
      * @throws SQLException
      */
     public String getSnapshot() throws SQLException{
-        String ticdcCFname = getTidbSnapshotParameter(TIDB_TICDC_CF_NAME_KEY,null);
-        if(ticdcCFname == null){
-            return null;
-        }
         ResultSet resultSet = null;
         try {
+            getCFname();
             if(this.preparedStatement == null){
                 this.preparedStatement = new AtomicReference<>();
             }
             if(this.preparedStatement.get() == null){
                 this.preparedStatement.set(this.connection.prepareStatement(QUERY_TIDB_SNAPSHOT_SQL));
             }
-            this.preparedStatement.get().setString(1,ticdcCFname);
+            this.preparedStatement.get().setString(1,this.ticdc.getTicdcCFname());
             resultSet = this.preparedStatement.get().executeQuery();
             while (resultSet.next()) {
                 final String secondaryTs = resultSet.getString("secondary_ts");
                 if(secondaryTs != null){
+                    System.out.println("ticdc-getSnapshot:"+secondaryTs);
                     return secondaryTs;
                 }
             }
@@ -188,6 +183,43 @@ public class TidbCdcOperate {
                 if(preparedStatement != null){
                     this.preparedStatement.get().close();
                 }
+            }
+            if(resultSet != null){
+                resultSet.close();
+            }
+        }
+    }
+
+    /**
+     *
+     * monitor getCFname
+     * @return getSnapshot
+     * @throws SQLException
+     */
+    public void getCFname() throws SQLException{
+        if(this.ticdc.getTicdcCFname() != null){
+            return;
+        }
+        ResultSet resultSet = null;
+        PreparedStatement preparedStatement = null;
+        try {
+            preparedStatement = this.connection.prepareStatement(QUERY_CFNAME_SQL);
+            resultSet = preparedStatement.executeQuery();
+            String cf = null;
+            while (resultSet.next()) {
+                if(cf == null){
+                    cf = resultSet.getString("cf");
+                }else {
+                    throw new SQLException("changefeed name is error");
+                }
+            }
+            System.out.println("ticdc-cfname:"+cf);
+            this.ticdc.setTicdcCFname(cf);
+        } catch (SQLException e){
+            throw new SQLException(e);
+        } finally {
+            if(preparedStatement != null){
+                preparedStatement.close();
             }
             if(resultSet != null){
                 resultSet.close();

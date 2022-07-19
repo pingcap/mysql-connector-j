@@ -614,6 +614,6 @@ public interface JdbcConnection extends java.sql.Connection, MysqlConnection, Tr
      */
     String getDatabase() throws SQLException;
 
-    default void refreshSnapshot(){};
+    default void refreshSnapshot(String sql){};
 
 }

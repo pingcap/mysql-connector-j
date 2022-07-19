@@ -143,9 +143,17 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         return secondaryTs.get();
     }
 
-    public void refreshSnapshot(){
+    public void refreshSnapshot(String sql){
         try {
-            TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+            if(sql.contains("`tidb_cdc`.`syncpoint_v1`")){
+                return;
+            }else if(sql.trim().startsWith("begin")){
+                TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+            }else if(sql.trim().startsWith("start transaction")){
+                TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+            }else if(getAutoCommit()){
+                TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+            }
         }catch (Exception e){
             throw new RuntimeException(e);
         }
@@ -2050,6 +2058,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                     this.session.execSQL(null, autoCommitFlag ? "SET autocommit=1" : "SET autocommit=0", -1, null, false, this.nullStatementResultSetFactory,
                             null, false);
                 }
+                if(!autoCommitFlag){
+                    TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+                }
             } catch (CJCommunicationsException e) {
                 throw e;
             } catch (CJException e) {
@@ -2057,6 +2068,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 this.session.getServerSession().setAutoCommit(isAutoCommit);
                 // Update the stacktrace.
                 throw SQLError.createSQLException(e.getMessage(), e.getSQLState(), e.getVendorCode(), e.isTransient(), e, getExceptionInterceptor());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             } finally {
                 if (this.autoReconnectForPools.getValue()) {
                     this.autoReconnect.setValue(false);
