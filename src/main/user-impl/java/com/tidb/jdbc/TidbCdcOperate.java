@@ -175,7 +175,7 @@ public class TidbCdcOperate {
                     return secondaryTs;
                 }
             }
-            throw new SQLException("secondary_ts is empty");
+            throw new SQLException("Table "+this.ticdc.getTicdcCFname()+" Record secondary_ts is empty");
         } catch (SQLException e){
             throw new SQLException(e);
         } finally {
@@ -210,8 +210,11 @@ public class TidbCdcOperate {
                 if(cf == null){
                     cf = resultSet.getString("cf");
                 }else {
-                    throw new SQLException("changefeed name is error");
+                    throw new SQLException("Found multiple changefeeds, recommend to set ticdcCFname to specify changefeed");
                 }
+            }
+            if(cf == null){
+                throw new SQLException("not Found changefeeds task name");
             }
             System.out.println("ticdc-cfname:"+cf);
             this.ticdc.setTicdcCFname(cf);

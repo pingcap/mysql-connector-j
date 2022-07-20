@@ -65,6 +65,7 @@ public class TicdcTest extends BaseTestCase {
                         }
                         Long globalSecondaryTs = conn1.getTicdc().getGlobalSecondaryTs().get();
                         Long secondaryTs = conn1.getSecondaryTs();
+                        assertTrue(conn1.getTicdc().getTicdcCFname() != null,"TicdcCFname 符合预期");
                         assertTrue(globalSecondaryTs != 0,  "globalSecondaryTs 符合预期");
                         assertTrue(secondaryTs != 0,  "secondaryTs 符合预期");
                         assertEquals(globalSecondaryTs.equals(secondaryTs), true, "secondaryTs一致 ");
@@ -74,11 +75,11 @@ public class TicdcTest extends BaseTestCase {
                     return 1;
                 });
         try {
+            conn.setAutoCommit(false);
             for (int i=0;i<20;i++){
-                conn.setAutoCommit(false);
                 JDBCRun.of(conn).run(sqlFlow);
-                conn.commit();
             }
+            conn.commit();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
