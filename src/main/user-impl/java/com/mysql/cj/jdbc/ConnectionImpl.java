@@ -161,7 +161,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
             }else if(sql.trim().toLowerCase().startsWith("start transaction")){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
-            }else if(getAutocommit()){
+            }else if(getAutoCommit()){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
             }
         }catch (Exception e){
