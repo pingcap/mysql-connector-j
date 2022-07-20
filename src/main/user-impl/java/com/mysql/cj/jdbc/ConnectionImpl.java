@@ -143,15 +143,25 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         return secondaryTs.get();
     }
 
+    public Ticdc getTicdc() {
+        return ticdc;
+    }
+
+    public void setTicdc(Ticdc ticdc) {
+        this.ticdc = ticdc;
+    }
+
     public void refreshSnapshot(String sql){
         try {
-            if(sql.contains("`tidb_cdc`.`syncpoint_v1`")){
+            if(sql == null || sql == ""){
                 return;
-            }else if(sql.trim().startsWith("begin")){
+            }else if(sql.contains("`tidb_cdc`.`syncpoint_v1`")){
+                return;
+            }else if(sql.trim().toLowerCase().startsWith("begin")){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
-            }else if(sql.trim().startsWith("start transaction")){
+            }else if(sql.trim().toLowerCase().startsWith("start transaction")){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
-            }else if(getAutoCommit()){
+            }else if(getAutocommit()){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
             }
         }catch (Exception e){
@@ -1139,6 +1149,12 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     public boolean getAutoCommit() throws SQLException {
         synchronized (getConnectionMutex()) {
             return this.session.getServerSession().isAutoCommit();
+        }
+    }
+
+    public boolean getAutocommit() throws SQLException {
+        synchronized (getConnectionMutex()) {
+            return this.session.getServerSession().isAutocommit();
         }
     }
 

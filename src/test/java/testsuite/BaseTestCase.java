@@ -144,7 +144,7 @@ public abstract class BaseTestCase {
         this.myInstanceNumber = instanceCount++;
 
         String newDbUrl = System.getProperty(PropertyDefinitions.SYSP_testsuite_url);
-        //newDbUrl = "jdbc:mysql://172.16.4.145:4000/banktest?user=root&password=&useUnicode=true&characterEncoding=UTF-8&useServerPrepStmts=true&useSSL=false&rewriteBatchedStatements=true";
+        newDbUrl = "jdbc:mysql://172.16.4.145:4000/banktest?user=root&password=&useUnicode=true&characterEncoding=UTF-8&useServerPrepStmts=true&useSSL=false&rewriteBatchedStatements=true&useTicdcACID=true";
         if ((newDbUrl != null) && (newDbUrl.trim().length() != 0)) {
             dbUrl = sanitizeDbName(newDbUrl);
         }
