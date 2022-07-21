@@ -166,15 +166,24 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
             }else if(sql.startsWith("start transaction")){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
-            }else if(sql.startsWith("set autocommit") && (sql.contains("0") || sql.contains("off"))){
-                TidbCdcOperate.of(this,ticdc).refreshSnapshot();
-                if(commitFlag.get()){
-                    commitFlag.set(false);
+            }else if(sql.startsWith("set autocommit")){
+                if(sql.contains("0") || sql.contains("off")){
+                    TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+                    if(commitFlag.get()){
+                        commitFlag.set(false);
+                    }
+                }else if(sql.contains("1") || sql.contains("on")){
+                    setAutoCommit(true);
+                    if(commitFlag.get()){
+                        commitFlag.set(false);
+                    }
                 }
-            }else if(commitFlag.get()){
+            }
+            if(commitFlag.get()){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
                 commitFlag.set(false);
-            }else if(getAutoCommit()){
+            }
+            if(getAutoCommit()){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
             }
         }catch (Exception e){
