@@ -172,9 +172,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             sql = sql.trim().toLowerCase();
             if(sql.startsWith("begin")){
                 manualTransaction();
-            }else if(sql.startsWith("start transaction")){
+            }else if(sql.contains("start") && sql.contains("transaction")){
                 manualTransaction();
-            }else if(sql.startsWith("set autocommit")){
+            }else if(sql.contains("set") && sql.contains("autocommit")){
                 if(sql.contains("0") || sql.contains("off")){
                     setAutoCommit(false);
                 }else if(sql.contains("1") || sql.contains("on")){
