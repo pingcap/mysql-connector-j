@@ -112,6 +112,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
     private AtomicBoolean commitFlag = new AtomicBoolean(false);
 
+    private AtomicBoolean cacheCommit = new AtomicBoolean(false);
+
     private Ticdc ticdc;
 
     @Override
@@ -153,13 +155,25 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         this.ticdc = ticdc;
     }
 
+    private void manualTransaction(){
+        try {
+            TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+            if(commitFlag.get()){
+                commitFlag.set(false);
+            }
+            cacheCommit.set(true);
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
     private void sqlFilter(String sql){
         try {
             sql = sql.trim().toLowerCase();
             if(sql.startsWith("begin")){
-                setAutoCommit(false);
+                manualTransaction();
             }else if(sql.startsWith("start transaction")){
-                setAutoCommit(false);
+                manualTransaction();
             }else if(sql.startsWith("set autocommit")){
                 if(sql.contains("0") || sql.contains("off")){
                     setAutoCommit(false);
@@ -171,8 +185,10 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 }
             }else if(sql.startsWith("commit")){
                 commitFlag.set(true);
+                cacheCommit.set(false);
             }else if(sql.startsWith("rollback")){
                 commitFlag.set(true);
+                cacheCommit.set(false);
             }
         }catch (Exception e){
             throw new RuntimeException(e);
@@ -192,7 +208,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
                 commitFlag.set(false);
             }
-            if(getAutoCommit()){
+            if(getAutoCommit() && !cacheCommit.get()){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
             }
         }catch (Exception e){
