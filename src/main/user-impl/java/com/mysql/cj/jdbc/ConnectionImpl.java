@@ -46,6 +46,7 @@ import java.util.Random;
 import java.util.Stack;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -62,7 +63,6 @@ import com.mysql.cj.Session.SessionEventListener;
 import com.mysql.cj.conf.HostInfo;
 import com.mysql.cj.conf.PropertyDefinitions.DatabaseTerm;
 import com.mysql.cj.conf.PropertyKey;
-import com.mysql.cj.conf.PropertySet;
 import com.mysql.cj.conf.RuntimeProperty;
 import com.mysql.cj.exceptions.CJCommunicationsException;
 import com.mysql.cj.exceptions.CJException;
@@ -109,6 +109,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     private static final SQLPermission ABORT_PERM = new SQLPermission("abort");
 
     private AtomicLong secondaryTs = new AtomicLong(0);
+
+    private AtomicBoolean commitFlag = new AtomicBoolean(false);
 
     private Ticdc ticdc;
 
@@ -160,6 +162,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             }else if(sql.trim().toLowerCase().startsWith("begin")){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
             }else if(sql.trim().toLowerCase().startsWith("start transaction")){
+                TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+            }else if(commitFlag.get()){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
             }else if(getAutoCommit()){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
@@ -828,6 +832,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 }
 
                 this.session.execSQL(null, "commit", -1, null, false, this.nullStatementResultSetFactory, null, false);
+                commitFlag.set(true);
             } catch (SQLException sqlException) {
                 if (MysqlErrorNumbers.SQL_STATE_COMMUNICATION_LINK_FAILURE.equals(sqlException.getSQLState())) {
                     throw SQLError.createSQLException(Messages.getString("Connection.4"), MysqlErrorNumbers.SQL_STATE_TRANSACTION_RESOLUTION_UNKNOWN,
@@ -836,6 +841,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
                 throw sqlException;
             } finally {
+                commitFlag.set(true);
                 this.session.setNeedsPing(this.reconnectAtTxEnd.getValue());
             }
         }
@@ -1952,6 +1958,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                     closeStatement(stmt);
                 }
             } finally {
+                commitFlag.set(true);
                 this.session.setNeedsPing(this.reconnectAtTxEnd.getValue());
             }
         }
@@ -2076,6 +2083,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 }
                 if(!autoCommitFlag){
                     TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+                }
+                if(commitFlag.get()){
+                    commitFlag.set(false);
                 }
             } catch (CJCommunicationsException e) {
                 throw e;

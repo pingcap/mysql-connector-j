@@ -10,16 +10,26 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class TicdcTest extends BaseTestCase {
 
-    @Test
-    public void testCdcQuery() throws Exception{
-        ConnectionImpl conn1 = (ConnectionImpl) this.conn;
+    private final static String QUERY_SQL = "select sum(balance) from accounts";
+
+    private void cdcValueAssert(ConnectionImpl conn1){
+        Long globalSecondaryTs = conn1.getTicdc().getGlobalSecondaryTs().get();
+        Long secondaryTs = conn1.getSecondaryTs();
+        String cfName = conn1.getTicdc().getTicdcCFname();
+        System.out.println("test-getCfname="+cfName);
+        assertTrue(cfName != null,"TicdcCFname 符合预期");
+        assertTrue(globalSecondaryTs != 0,  "globalSecondaryTs 符合预期");
+        assertTrue(secondaryTs != 0,  "secondaryTs 符合预期");
+        assertEquals(globalSecondaryTs.equals(secondaryTs), true, "secondaryTs一致 ");
+    }
+
+    private Map<String, Function<ResultSet,Integer>> sqlFlow(ConnectionImpl conn1){
         Map<String, Function<ResultSet,Integer>> sqlFlow = new HashMap<>();
-        sqlFlow.put("select sum(balance) from accounts",
+        sqlFlow.put(QUERY_SQL,
                 (ResultSet result)->{
                     try {
                         if (result.next()) {
@@ -28,22 +38,32 @@ public class TicdcTest extends BaseTestCase {
                                 assertTrue(sum == 100000,"符合预期，大于等于上一个值");
                             }
                         }
-                        Long globalSecondaryTs = conn1.getTicdc().getGlobalSecondaryTs().get();
-                        Long secondaryTs = conn1.getSecondaryTs();
-                        assertTrue(globalSecondaryTs != 0,  "globalSecondaryTs 符合预期");
-                        assertTrue(secondaryTs != 0,  "secondaryTs 符合预期");
-                        assertEquals(globalSecondaryTs.equals(secondaryTs), true, "secondaryTs一致 ");
+                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
                     return 1;
                 });
+        return sqlFlow;
+    }
+
+    @Test
+    public void testCdcQuery() throws Exception{
+        ConnectionImpl conn1 = (ConnectionImpl) this.conn;
+        Map<String, Function<ResultSet,Integer>> sqlFlow = sqlFlow(conn1);
         try {
-            for (int i=0;i<20;i++){
-                //conn.setAutoCommit(false);
-                JDBCRun.of(conn).run(sqlFlow);
-                //conn.commit();
-            }
+            JDBCRun.of(conn1).multipleRun(sqlFlow,20);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    public void testCdcBaseQuery() throws Exception{
+        ConnectionImpl conn1 = (ConnectionImpl) this.conn;
+        Map<String, Function<ResultSet,Integer>> sqlFlow = sqlFlow(conn1);
+        try {
+            JDBCRun.of(conn1).multipleRunBase(sqlFlow,20);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -54,7 +74,7 @@ public class TicdcTest extends BaseTestCase {
     public void testCdcTransactionQuery() throws Exception{
         ConnectionImpl conn1 = (ConnectionImpl) this.conn;
         Map<String, Function<ResultSet,Integer>> sqlFlow = new HashMap<>();
-        sqlFlow.put("select sum(balance) from accounts",
+        sqlFlow.put(QUERY_SQL,
                 (ResultSet result)->{
                     try {
                         if (result.next()) {
@@ -63,12 +83,7 @@ public class TicdcTest extends BaseTestCase {
                                 assertTrue(sum == 100000,"符合预期，大于等于上一个值");
                             }
                         }
-                        Long globalSecondaryTs = conn1.getTicdc().getGlobalSecondaryTs().get();
-                        Long secondaryTs = conn1.getSecondaryTs();
-                        assertTrue(conn1.getTicdc().getTicdcCFname() != null,"TicdcCFname 符合预期");
-                        assertTrue(globalSecondaryTs != 0,  "globalSecondaryTs 符合预期");
-                        assertTrue(secondaryTs != 0,  "secondaryTs 符合预期");
-                        assertEquals(globalSecondaryTs.equals(secondaryTs), true, "secondaryTs一致 ");
+                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
@@ -76,10 +91,21 @@ public class TicdcTest extends BaseTestCase {
                 });
         try {
             conn.setAutoCommit(false);
-            for (int i=0;i<20;i++){
-                JDBCRun.of(conn).run(sqlFlow);
-            }
+            JDBCRun.of(conn).multipleRun(sqlFlow,20);
             conn.commit();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    public void testCdcUserTransactionQuery() throws Exception{
+        ConnectionImpl conn1 = (ConnectionImpl) this.conn;
+        Map<String, Function<ResultSet,Integer>> sqlFlow = new HashMap<>();
+        sqlFlow.put("begin",null);
+
+        try {
+            JDBCRun.of(conn1).runBase(sqlFlow);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

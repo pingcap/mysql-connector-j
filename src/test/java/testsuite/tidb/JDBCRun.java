@@ -5,8 +5,6 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.function.Function;
 
 public class JDBCRun {
@@ -40,39 +38,16 @@ public class JDBCRun {
         }
     }
 
-    public void runPrepared(String sql, Function<ResultSet,Integer> fun){
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ResultSet result = ps.executeQuery();
-            fun.apply(result);
-        }catch (SQLException e) {
-            log.error("PrepareTest error",e);
-            throw new RuntimeException(e);
-        }
-    }
-
-
     public void run(Map<String,Function<ResultSet,Integer>> sqlFlow){
         sqlFlow.forEach((k,v)->{
-            try (PreparedStatement ps = conn.prepareStatement(k)) {
-                ResultSet result = ps.executeQuery();
-                v.apply(result);
-            }catch (SQLException e) {
-                log.error("run error",e);
-                throw new RuntimeException(e);
-            }
+            run(k, v);
         });
     }
 
-    public void runPrepared(Map<String,Function<ResultSet,Integer>> sqlFlow){
-        sqlFlow.forEach((k,v)->{
-            try (PreparedStatement ps = conn.prepareStatement(k)) {
-                ResultSet result = ps.executeQuery();
-                v.apply(result);
-            }catch (SQLException e) {
-                log.error("run error",e);
-                throw new RuntimeException(e);
-            }
-        });
+    public void multipleRun(Map<String,Function<ResultSet,Integer>> sqlFlow,int count){
+        for(int i=0;i<count;i++){
+            run(sqlFlow);
+        }
     }
 
     public void runBase(String sql, Function<ResultSet,Integer> fun){
@@ -81,9 +56,11 @@ public class JDBCRun {
         try {
             ps = conn.createStatement();
             result = ps.executeQuery(sql);
-            fun.apply(result);
+            if(fun != null){
+                fun.apply(result);
+            }
         } catch (SQLException e) {
-            log.error("PrepareTest error",e);
+            log.error("Statement error",e);
             throw new RuntimeException(e);
         }finally {
             if (result != null) {
@@ -98,6 +75,18 @@ public class JDBCRun {
                 } catch (SQLException sqlEx) { } // ignore
                 ps = null;
             }
+        }
+    }
+
+    public void runBase(Map<String,Function<ResultSet,Integer>> sqlFlow){
+        sqlFlow.forEach((k,v)->{
+            runBase(k, v);
+        });
+    }
+
+    public void multipleRunBase(Map<String,Function<ResultSet,Integer>> sqlFlow,int count){
+        for(int i=0;i<count;i++){
+            runBase(sqlFlow);
         }
     }
 }

@@ -94,7 +94,7 @@ public class TidbCdcOperate {
             }
 
         }catch (SQLException e){
-            System.out.println("ticdc-refreshSnapshot:"+e);
+            //System.out.println("ticdc-refreshSnapshot:"+e);
             throw new RuntimeException(e);
         }
         return this;
@@ -109,7 +109,7 @@ public class TidbCdcOperate {
     private void setConnectionSnapshot(Long secondaryTs){
         this.connection.getSession().setSnapshot(secondaryTs+"");
         this.connection.setSecondaryTs(secondaryTs);
-        System.out.println("ticdc-setConnectionSnapshot:"+secondaryTs);
+        //System.out.println("ticdc-setConnectionSnapshot:"+secondaryTs);
     }
 
     /**
@@ -171,7 +171,7 @@ public class TidbCdcOperate {
             while (resultSet.next()) {
                 final String secondaryTs = resultSet.getString("secondary_ts");
                 if(secondaryTs != null){
-                    System.out.println("ticdc-getSnapshot:"+secondaryTs);
+                    //System.out.println("ticdc-getSnapshot:"+secondaryTs);
                     return secondaryTs;
                 }
             }
@@ -216,7 +216,7 @@ public class TidbCdcOperate {
             if(cf == null){
                 throw new SQLException("not Found changefeeds task name");
             }
-            System.out.println("ticdc-cfname:"+cf);
+            //System.out.println("ticdc-cfname:"+cf);
             this.ticdc.setTicdcCFname(cf);
         } catch (SQLException e){
             throw new SQLException(e);
