@@ -48,7 +48,9 @@ public class JDBCRun {
         for(int i=0;i<count;i++){
             run(sqlFlow);
             try {
-                Thread.sleep(timeRun);
+                if(timeRun != null){
+                    Thread.sleep(timeRun);
+                }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -83,15 +85,48 @@ public class JDBCRun {
         }
     }
 
+    public void runBaseExecute(String sql){
+        Statement ps = null;
+        ResultSet result = null;
+        try {
+            ps = conn.createStatement();
+            Boolean state = ps.execute(sql);
+            System.out.println(state);
+        } catch (SQLException e) {
+            log.error("Statement error",e);
+            throw new RuntimeException(e);
+        }finally {
+            if (result != null) {
+                try {
+                    result.close();
+                } catch (SQLException sqlEx) { } // ignore
+                result = null;
+            }
+            if (ps != null) {
+                try {
+                    ps.close();
+                } catch (SQLException sqlEx) { } // ignore
+                ps = null;
+            }
+        }
+    }
+
     public void runBase(Map<String,Function<ResultSet,Integer>> sqlFlow){
         sqlFlow.forEach((k,v)->{
             runBase(k, v);
         });
     }
 
-    public void multipleRunBase(Map<String,Function<ResultSet,Integer>> sqlFlow,int count){
+    public void multipleRunBase(Map<String,Function<ResultSet,Integer>> sqlFlow,int count,Long timeRun){
         for(int i=0;i<count;i++){
             runBase(sqlFlow);
+            try {
+                if(timeRun != null){
+                    Thread.sleep(timeRun);
+                }
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 }
