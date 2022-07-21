@@ -34,6 +34,7 @@ import com.mysql.cj.conf.ConnectionUrl;
 import com.mysql.cj.jdbc.ConnectionImpl;
 import com.tidb.jdbc.TidbCdcOperate;
 
+import java.sql.Connection;
 import java.sql.Driver;
 
 import java.sql.PreparedStatement;
@@ -219,7 +220,9 @@ public class Monitor {
         try {
             if(this.conn.get() == null){
                 if(connLock.tryLock()){
-                    this.conn.set(driver.connect(this.url,this.info));
+                    Connection conn = driver.connect(this.url,this.info);
+                    conn.setAutoCommit(true);
+                    this.conn.set(conn);
                     connLock.unlock();
                 }
             }

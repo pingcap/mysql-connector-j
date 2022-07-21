@@ -44,9 +44,14 @@ public class JDBCRun {
         });
     }
 
-    public void multipleRun(Map<String,Function<ResultSet,Integer>> sqlFlow,int count){
+    public void multipleRun(Map<String,Function<ResultSet,Integer>> sqlFlow,int count,Long timeRun){
         for(int i=0;i<count;i++){
             run(sqlFlow);
+            try {
+                Thread.sleep(timeRun);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
