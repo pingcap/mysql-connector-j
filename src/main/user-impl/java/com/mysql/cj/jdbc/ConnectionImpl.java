@@ -153,14 +153,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         this.ticdc = ticdc;
     }
 
-    public void refreshSnapshot(String sql){
+    private void sqlFilter(String sql){
         try {
-            if(sql == null || sql == ""){
-                return;
-            }
-            if(sql.contains("`tidb_cdc`.`syncpoint_v1`")){
-                return;
-            }
             sql = sql.trim().toLowerCase();
             if(sql.startsWith("begin")){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
@@ -178,7 +172,25 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                         commitFlag.set(false);
                     }
                 }
+            }else if(sql.startsWith("commit")){
+                commitFlag.set(true);
+            }else if(sql.startsWith("rollback")){
+                commitFlag.set(true);
             }
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void refreshSnapshot(String sql){
+        try {
+            if(sql == null || sql == ""){
+                return;
+            }
+            if(sql.contains("`tidb_cdc`.`syncpoint_v1`")){
+                return;
+            }
+            sqlFilter( sql);
             if(commitFlag.get()){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
                 commitFlag.set(false);
@@ -1887,6 +1899,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 }
                 try {
                     rollbackNoChecks();
+                    commitFlag.set(true);
                 } catch (SQLException sqlEx) {
                     // We ignore non-transactional tables if told to do so
                     if (this.ignoreNonTxTables.getInitialValue() && (sqlEx.getErrorCode() == MysqlErrorNumbers.ER_WARNING_NOT_COMPLETE_ROLLBACK)) {
@@ -1903,6 +1916,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
                 throw sqlException;
             } finally {
+                commitFlag.set(true);
                 this.session.setNeedsPing(this.reconnectAtTxEnd.getValue());
             }
         }
