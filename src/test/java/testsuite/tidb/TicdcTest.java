@@ -24,10 +24,10 @@ public class TicdcTest extends BaseTestCase {
         Long globalSecondaryTs = conn1.getTicdc().getGlobalSecondaryTs().get();
         Long secondaryTs = conn1.getSecondaryTs();
         String cfName = conn1.getTicdc().getTicdcCFname();
-        //System.out.println("test-getCfname="+cfName);
-        assertTrue(cfName != null,"TicdcCFname 符合预期");
-        assertTrue(globalSecondaryTs != 0,  "globalSecondaryTs 符合预期");
-        assertTrue(secondaryTs != 0,  "secondaryTs 符合预期");
+        System.out.println("test-getCfname="+cfName);
+        assertTrue(cfName != null,"TicdcCFname 不符合预期");
+        assertTrue(globalSecondaryTs != 0,  "globalSecondaryTs不符合预期");
+        assertTrue(secondaryTs != 0,  "secondaryTs 不符合预期");
         //assertEquals(globalSecondaryTs.equals(secondaryTs), true, "secondaryTs不一致 ");
         //System.out.println("test-globalSecondaryTsValue:"+globalSecondaryTsValue + ",globalSecondaryTs:"+globalSecondaryTs);
         if(globalSecondaryTsValue == 0){
@@ -150,6 +150,64 @@ public class TicdcTest extends BaseTestCase {
             while (true){
                 JDBCRun.of(conn).multipleRun(sqlFlow,5,5000L);
                 conn.commit();
+                System.out.println("test-commit");
+                Thread.sleep(5000L);
+            }
+
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    @Test
+    public void testBaseTransactionQuery() throws Exception{
+        ConnectionImpl conn1 = (ConnectionImpl) this.conn;
+        Map<String, Function<ResultSet,Integer>> sqlFlow = new HashMap<>();
+        sqlFlow.put("select * from test",
+                (ResultSet result)->{
+                    try {
+                        if (result.next()) {
+                            Long id = result.getLong(1);
+                            System.out.println("id="+id);
+                        }
+                        cdcValueAssert(conn1);
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                    return 1;
+                });
+        sqlFlow.put("show variables like 'tidb_snapshot'",
+                (ResultSet result)->{
+                    try {
+                        if (result.next()) {
+                            String value = result.getString("Value");
+                            System.out.println("value="+value);
+                        }
+                        cdcValueAssert(conn1);
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                    return 1;
+                });
+        sqlFlow.put("select * from test",
+                (ResultSet result)->{
+                    try {
+                        if (result.next()) {
+                            Long id = result.getLong(1);
+                            System.out.println("id="+id);
+                        }
+                        cdcValueAssert(conn1);
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                    return 1;
+                });
+        try {
+            while (true){
+                JDBCRun.of(conn).multipleRunBase(sqlFlow,1);
+                //conn.commit();
                 System.out.println("test-commit");
                 Thread.sleep(5000L);
             }

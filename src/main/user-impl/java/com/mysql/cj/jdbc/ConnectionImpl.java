@@ -157,12 +157,17 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         try {
             if(sql == null || sql == ""){
                 return;
-            }else if(sql.contains("`tidb_cdc`.`syncpoint_v1`")){
+            }
+            if(sql.contains("`tidb_cdc`.`syncpoint_v1`")){
                 return;
-            }else if(sql.trim().toLowerCase().startsWith("begin")){
+            }
+            sql = sql.trim().toLowerCase();
+            if(sql.startsWith("begin")){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
-            }else if(sql.trim().toLowerCase().startsWith("start transaction")){
+            }else if(sql.startsWith("start transaction")){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+            }else if(sql.startsWith("set autocommit") && (sql.contains("0") || sql.contains("off"))){
+                    TidbCdcOperate.of(this,ticdc).refreshSnapshot();
             }else if(commitFlag.get()){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
                 commitFlag.set(false);
@@ -172,8 +177,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         }catch (Exception e){
             throw new RuntimeException(e);
         }
-
     }
+
 
     // this connection has to be proxied when using multi-host settings so that statements get routed to the right physical connection
     // (works as "logical" connection)
