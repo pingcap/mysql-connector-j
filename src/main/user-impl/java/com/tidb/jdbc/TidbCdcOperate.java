@@ -92,9 +92,7 @@ public class TidbCdcOperate {
             if(this.connection != null){
                 setSnapshot();
             }
-
         }catch (SQLException e){
-            //System.out.println("ticdc-refreshSnapshot:"+e);
             throw new RuntimeException(e);
         }
         return this;
@@ -109,7 +107,6 @@ public class TidbCdcOperate {
     private void setConnectionSnapshot(Long secondaryTs){
         this.connection.getSession().setSnapshot(secondaryTs+"");
         this.connection.setSecondaryTs(secondaryTs);
-        //System.out.println("ticdc-setConnectionSnapshot:"+secondaryTs);
     }
 
     /**
@@ -121,7 +118,6 @@ public class TidbCdcOperate {
      */
     public TidbCdcOperate setSnapshot() throws SQLException{
         if(this.connection.getSecondaryTs() == 0){
-            //this.connection.getSession().setSnapshot("");
             String secondaryTs = getSnapshot();
             if(secondaryTs != null){
                 Long secondaryTsValue = Long.parseLong(secondaryTs);
@@ -135,16 +131,6 @@ public class TidbCdcOperate {
         if(this.connection.getSecondaryTs() == this.ticdc.getGlobalSecondaryTs().get()){
             return this;
         }
-
-//        if(this.connection.getSecondaryTs() == 0){
-//            this.connection.getSession().setSnapshot("");
-//            String secondaryTs = getSnapshot();
-//            if(secondaryTs != null){
-//                Long secondaryTsValue = Long.parseLong(secondaryTs);
-//                this.connection.setSecondaryTs(secondaryTsValue);
-//                this.connection.getSession().setSnapshot(secondaryTs);
-//            }
-//        }else
         setConnectionSnapshot(this.ticdc.getGlobalSecondaryTs().get());
         return this;
     }
@@ -171,7 +157,6 @@ public class TidbCdcOperate {
             while (resultSet.next()) {
                 final String secondaryTs = resultSet.getString("secondary_ts");
                 if(secondaryTs != null){
-                    //System.out.println("ticdc-getSnapshot:"+secondaryTs);
                     return secondaryTs;
                 }
             }

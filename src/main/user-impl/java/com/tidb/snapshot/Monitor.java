@@ -153,7 +153,6 @@ public class Monitor {
             if(this.useTicdcACID != null){
                 this.ticdc.setUseTicdcACID(this.useTicdcACID);
             }
-            //System.out.println("ticdc-parser,ticdcCFname:"+ticdcCFname+",ticdcACIDIntervalValue:"+ticdcACIDIntervalValue+",useTicdcACID:"+useTicdcACID);
         }
     }
 
