@@ -24,20 +24,9 @@ public class TicdcTest extends BaseTestCase {
         Long globalSecondaryTs = conn1.getTicdc().getGlobalSecondaryTs().get();
         Long secondaryTs = conn1.getSecondaryTs();
         String cfName = conn1.getTicdc().getTicdcCFname();
-        //System.out.println("test-getCfname="+cfName);
         assertTrue(cfName != null,"TicdcCFname 不符合预期");
         assertTrue(globalSecondaryTs != 0,  "globalSecondaryTs不符合预期");
         assertTrue(secondaryTs != 0,  "secondaryTs 不符合预期");
-        //assertEquals(globalSecondaryTs.equals(secondaryTs), true, "secondaryTs不一致 ");
-        if(globalSecondaryTsValue == 0){
-            System.out.println("test-globalSecondaryTs:"+globalSecondaryTs+",secondaryTs:"+secondaryTs);
-        }else if(!globalSecondaryTsValue.equals(globalSecondaryTs)){
-            System.out.println("test-globalSecondaryTs:"+globalSecondaryTs+",secondaryTs:"+secondaryTs);
-        }else if(!secondaryTsValue.equals(secondaryTs)){
-            System.out.println("test-globalSecondaryTs:"+globalSecondaryTs+",secondaryTs:"+secondaryTs);
-        }
-
-
         globalSecondaryTsValue = globalSecondaryTs;
         secondaryTsValue = secondaryTs;
 
@@ -137,7 +126,6 @@ public class TicdcTest extends BaseTestCase {
                     try {
                         if (result.next()) {
                             Long id = result.getLong(1);
-                            System.out.println("id="+id);
                         }
                         cdcValueAssert(conn1);
                     } catch (SQLException e) {
@@ -146,12 +134,9 @@ public class TicdcTest extends BaseTestCase {
                     return 1;
                 });
         try {
-            while (true){
-                JDBCRun.of(conn).multipleRun(sqlFlow,5,5000L);
-                conn.commit();
-                System.out.println("test-commit");
-                Thread.sleep(5000L);
-            }
+            JDBCRun.of(conn).multipleRun(sqlFlow,5,5000L);
+            conn.commit();
+            Thread.sleep(5000L);
 
 
         } catch (Exception e) {
@@ -169,7 +154,6 @@ public class TicdcTest extends BaseTestCase {
                     try {
                         if (result.next()) {
                             Long id = result.getLong(1);
-                            System.out.println("id="+id);
                         }
                         cdcValueAssert(conn1);
                     } catch (SQLException e) {
@@ -196,7 +180,6 @@ public class TicdcTest extends BaseTestCase {
                     try {
                         if (result.next()) {
                             String  val= result.getString("Value") ;
-                            System.out.println("val="+val);
                         }
                         cdcValueAssert(conn1);
                     } catch (SQLException e) {
@@ -209,7 +192,6 @@ public class TicdcTest extends BaseTestCase {
                     try {
                         if (result.next()) {
                             Long id = result.getLong(1);
-                            System.out.println("id="+id);
                         }
                         cdcValueAssert(conn1);
                     } catch (SQLException e) {
@@ -222,11 +204,10 @@ public class TicdcTest extends BaseTestCase {
             while (true){
                 JDBCRun.of(conn).multipleRunBase(sqlFlow,2,1000L);
                 JDBCRun.of(conn).runBaseExecute("start transaction");
-                for (int i=0;i<100;i++){
+                for (int i=0;i<10;i++){
                     JDBCRun.of(conn).multipleRunBase(sqlFlow1,10,2000L);
                     JDBCRun.of(conn).runBaseExecute("commit");
                     //conn.commit();
-                    System.out.println("test-commit");
                     Thread.sleep(5000L);
                 }
 
@@ -249,7 +230,6 @@ public class TicdcTest extends BaseTestCase {
                     try {
                         if (result.next()) {
                             String  val= result.getString("Value") ;
-                            System.out.println("val="+val);
                         }
                         cdcValueAssert(conn1);
                     } catch (SQLException e) {
@@ -262,7 +242,6 @@ public class TicdcTest extends BaseTestCase {
                     try {
                         if (result.next()) {
                             Long id = result.getLong(1);
-                            System.out.println("id="+id);
                         }
                         cdcValueAssert(conn1);
                     } catch (SQLException e) {
@@ -272,22 +251,16 @@ public class TicdcTest extends BaseTestCase {
                 });
 
         try {
-            while (true){
-                System.out.println("========默认状态==========");
-                JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-                System.out.println("========setAutoCommit(true)状态==========");
-                conn1.setAutoCommit(true);
-                Thread.sleep(5000L);
-                JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-                System.out.println("========setAutoCommit(false)状态==========");
-                conn1.setAutoCommit(false);
-                JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-                Thread.sleep(5000L);
-                System.out.println("========setAutoCommit(true)状态==========");
-                conn1.setAutoCommit(true);
-                JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-                Thread.sleep(5000L);
-            }
+            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+            conn1.setAutoCommit(true);
+            Thread.sleep(5000L);
+            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+            conn1.setAutoCommit(false);
+            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+            Thread.sleep(5000L);
+            conn1.setAutoCommit(true);
+            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+            Thread.sleep(5000L);
 
 
         } catch (Exception e) {
@@ -306,7 +279,6 @@ public class TicdcTest extends BaseTestCase {
                     try {
                         if (result.next()) {
                             String  val= result.getString("Value") ;
-                            System.out.println("val="+val);
                         }
                         cdcValueAssert(conn1);
                     } catch (SQLException e) {
@@ -319,7 +291,6 @@ public class TicdcTest extends BaseTestCase {
                     try {
                         if (result.next()) {
                             Long id = result.getLong(1);
-                            System.out.println("id="+id);
                         }
                         cdcValueAssert(conn1);
                     } catch (SQLException e) {
@@ -329,23 +300,17 @@ public class TicdcTest extends BaseTestCase {
                 });
 
         try {
-            while (true){
-                System.out.println("========默认状态==========");
-                JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-                System.out.println("========setAutoCommit(true)状态==========");
-                conn1.setAutoCommit(true);
-                Thread.sleep(5000L);
-                JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-                System.out.println("========start transaction状态==========");
-                JDBCRun.of(conn).runBaseExecute("start transaction");
-                JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-                JDBCRun.of(conn).runBaseExecute("commit");
-                Thread.sleep(5000L);
-                System.out.println("========begin状态==========");
-                JDBCRun.of(conn).runBaseExecute("begin");
-                JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-                JDBCRun.of(conn).runBaseExecute("commit");
-            }
+            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+            conn1.setAutoCommit(true);
+            Thread.sleep(5000L);
+            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+            JDBCRun.of(conn).runBaseExecute("start transaction");
+            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+            JDBCRun.of(conn).runBaseExecute("commit");
+            Thread.sleep(5000L);
+            JDBCRun.of(conn).runBaseExecute("begin");
+            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+            JDBCRun.of(conn).runBaseExecute("commit");
 
 
         } catch (Exception e) {

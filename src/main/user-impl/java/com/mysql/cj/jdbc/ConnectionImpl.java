@@ -113,14 +113,14 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     /**
      * sql start transaction and begin start transaction flag
      */
-    private AtomicBoolean commitFlag = new AtomicBoolean(false);
+    private AtomicBoolean isTxnStart = new AtomicBoolean(false);
 
     /**
      * sql start transaction and begin
      * start transaction
      * AutoCommit state
      */
-    private AtomicBoolean cacheCommit = new AtomicBoolean(false);
+    private AtomicBoolean isSessAutoCommit = new AtomicBoolean(false);
 
     private Ticdc ticdc;
 
@@ -170,10 +170,10 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     private void startTransaction(){
         try {
             TidbCdcOperate.of(this,ticdc).refreshSnapshot();
-            if(commitFlag.get()){
-                commitFlag.set(false);
+            if(isTxnStart.get()){
+                isTxnStart.set(false);
             }
-            cacheCommit.set(true);
+            isSessAutoCommit.set(true);
         }catch (Exception e){
             throw new RuntimeException(e);
         }
@@ -183,8 +183,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
      * manual emd Transaction refreshSnapshot
      */
     private void endTransaction(){
-        commitFlag.set(true);
-        cacheCommit.set(false);
+        isTxnStart.set(true);
+        isSessAutoCommit.set(false);
     }
 
     /**
@@ -193,8 +193,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     private void onAutocommit(){
         try {
             setAutoCommit(true);
-            if(commitFlag.get()){
-                commitFlag.set(false);
+            if(isTxnStart.get()){
+                isTxnStart.set(false);
             }
         }catch (Exception e){
             throw new RuntimeException(e);
@@ -247,11 +247,11 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 return;
             }
             transactionFlow( sql);
-            if(commitFlag.get()){
+            if(isTxnStart.get()){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
-                commitFlag.set(false);
+                isTxnStart.set(false);
             }
-            if(getAutoCommit() && !cacheCommit.get()){
+            if(getAutoCommit() && !isSessAutoCommit.get()){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
             }
         }catch (Exception e){
@@ -918,7 +918,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 }
 
                 this.session.execSQL(null, "commit", -1, null, false, this.nullStatementResultSetFactory, null, false);
-                commitFlag.set(true);
+                isTxnStart.set(true);
             } catch (SQLException sqlException) {
                 if (MysqlErrorNumbers.SQL_STATE_COMMUNICATION_LINK_FAILURE.equals(sqlException.getSQLState())) {
                     throw SQLError.createSQLException(Messages.getString("Connection.4"), MysqlErrorNumbers.SQL_STATE_TRANSACTION_RESOLUTION_UNKNOWN,
@@ -927,7 +927,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
                 throw sqlException;
             } finally {
-                commitFlag.set(true);
+                isTxnStart.set(true);
                 this.session.setNeedsPing(this.reconnectAtTxEnd.getValue());
             }
         }
@@ -1956,7 +1956,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 }
                 try {
                     rollbackNoChecks();
-                    commitFlag.set(true);
+                    isTxnStart.set(true);
                 } catch (SQLException sqlEx) {
                     // We ignore non-transactional tables if told to do so
                     if (this.ignoreNonTxTables.getInitialValue() && (sqlEx.getErrorCode() == MysqlErrorNumbers.ER_WARNING_NOT_COMPLETE_ROLLBACK)) {
@@ -1973,7 +1973,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
                 throw sqlException;
             } finally {
-                commitFlag.set(true);
+                isTxnStart.set(true);
                 this.session.setNeedsPing(this.reconnectAtTxEnd.getValue());
             }
         }
@@ -2047,7 +2047,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                     closeStatement(stmt);
                 }
             } finally {
-                commitFlag.set(true);
+                isTxnStart.set(true);
                 this.session.setNeedsPing(this.reconnectAtTxEnd.getValue());
             }
         }
@@ -2173,8 +2173,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 if(!autoCommitFlag){
                     TidbCdcOperate.of(this,ticdc).refreshSnapshot();
                 }
-                if(commitFlag.get()){
-                    commitFlag.set(false);
+                if(isTxnStart.get()){
+                    isTxnStart.set(false);
                 }
             } catch (CJCommunicationsException e) {
                 throw e;
