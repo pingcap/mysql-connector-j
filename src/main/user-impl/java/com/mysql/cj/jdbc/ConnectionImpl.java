@@ -1732,6 +1732,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             } else {
                 pStmt = (ClientPreparedStatement) clientPrepareStatement(nativeSql, resultSetType, resultSetConcurrency, false);
             }
+
             //PreparedStatementProxy proxy = new PreparedStatementProxy(this,pStmt,ticdc);
             return pStmt;
         }
