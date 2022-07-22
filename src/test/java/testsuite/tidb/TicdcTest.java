@@ -353,4 +353,18 @@ public class TicdcTest extends BaseTestCase {
         }
     }
 
+
+    @Test
+    public void testSql() throws Exception{
+        ConnectionImpl conn1 = (ConnectionImpl) this.conn;
+
+        try {
+            JDBCRun.of(conn1).run("begin");
+            JDBCRun.of(conn1).runBaseExecute("begin");
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }

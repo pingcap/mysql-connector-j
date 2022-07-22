@@ -38,6 +38,16 @@ public class JDBCRun {
         }
     }
 
+    public void run(String sql){
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            Boolean state = ps.execute();
+            System.out.println("run state:"+state);
+        }catch (SQLException e) {
+            log.error("PrepareTest error",e);
+            throw new RuntimeException(e);
+        }
+    }
+
     public void run(Map<String,Function<ResultSet,Integer>> sqlFlow){
         sqlFlow.forEach((k,v)->{
             run(k, v);
@@ -91,7 +101,7 @@ public class JDBCRun {
         try {
             ps = conn.createStatement();
             Boolean state = ps.execute(sql);
-            System.out.println(state);
+            System.out.println("runBaseExecute state:"+state);
         } catch (SQLException e) {
             log.error("Statement error",e);
             throw new RuntimeException(e);
