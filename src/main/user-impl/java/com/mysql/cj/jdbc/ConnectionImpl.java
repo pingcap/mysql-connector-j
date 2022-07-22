@@ -110,8 +110,16 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
     private AtomicLong secondaryTs = new AtomicLong(0);
 
+    /**
+     * sql start transaction and begin start transaction flag
+     */
     private AtomicBoolean commitFlag = new AtomicBoolean(false);
 
+    /**
+     * sql start transaction and begin
+     * start transaction
+     * AutoCommit state
+     */
     private AtomicBoolean cacheCommit = new AtomicBoolean(false);
 
     private Ticdc ticdc;

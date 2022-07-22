@@ -276,6 +276,10 @@ public class Monitor {
     }
 
 
+    /**
+     * close jdbc preparedStatement conn object
+     * @return
+     */
     public Monitor close(){
         try {
             if(this.preparedStatement.get() != null){

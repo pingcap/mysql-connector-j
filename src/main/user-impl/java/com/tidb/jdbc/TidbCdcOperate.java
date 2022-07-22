@@ -104,6 +104,11 @@ public class TidbCdcOperate {
         return this;
     }
 
+    /**
+     *
+     * set Connection Snapshot
+     * @param secondaryTs
+     */
     private void setConnectionSnapshot(Long secondaryTs){
         this.connection.getSession().setSnapshot(secondaryTs+"");
         this.connection.setSecondaryTs(secondaryTs);
