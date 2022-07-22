@@ -163,10 +163,11 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         this.ticdc = ticdc;
     }
 
+
     /**
-     * manual Transaction refreshSnapshot
+     * manual start Transaction refreshSnapshot
      */
-    private void manualTransaction(){
+    private void startTransaction(){
         try {
             TidbCdcOperate.of(this,ticdc).refreshSnapshot();
             if(commitFlag.get()){
@@ -179,26 +180,52 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     }
 
     /**
+     * manual emd Transaction refreshSnapshot
+     */
+    private void endTransaction(){
+        commitFlag.set(true);
+        cacheCommit.set(false);
+    }
+
+    /**
+     * start Autocommit
+     */
+    private void onAutocommit(){
+        try {
+            setAutoCommit(true);
+            if(commitFlag.get()){
+                commitFlag.set(false);
+            }
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void offAutocommit(){
+        try {
+            setAutoCommit(false);
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
      *
-     * Transaction sql Filter
+     * Transaction sql flow
      * @param sql
      */
-    private void sqlFilter(String sql){
+    private void transactionFlow(String sql){
         try {
             sql = sql.trim().toLowerCase();
             if(sql.startsWith("begin") || (sql.contains("start") && sql.contains("transaction"))){
-                manualTransaction();
+                startTransaction();
             }else if(sql.startsWith("commit") || sql.startsWith("rollback")){
-                commitFlag.set(true);
-                cacheCommit.set(false);
+                endTransaction();
             }else if(sql.contains("set") && sql.contains("autocommit")){
                 if(sql.contains("0") || sql.contains("off")){
-                    setAutoCommit(false);
+                    offAutocommit();
                 }else if(sql.contains("1") || sql.contains("on")){
-                    setAutoCommit(true);
-                    if(commitFlag.get()){
-                        commitFlag.set(false);
-                    }
+                    onAutocommit();
                 }
             }
         }catch (Exception e){
@@ -219,7 +246,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             if(sql.contains("`tidb_cdc`.`syncpoint_v1`")){
                 return;
             }
-            sqlFilter( sql);
+            transactionFlow( sql);
             if(commitFlag.get()){
                 TidbCdcOperate.of(this,ticdc).refreshSnapshot();
                 commitFlag.set(false);
