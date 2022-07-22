@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2002, 2020, Oracle and/or its affiliates.
  *
@@ -38,15 +39,19 @@ import java.sql.Connection;
 import java.sql.Driver;
 
 import java.sql.PreparedStatement;
+
 import java.sql.SQLException;
 import java.util.Properties;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import java.util.concurrent.atomic.AtomicLong;
+
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
 
 /**
  * Monitor tidb cdc SecondaryTs value
@@ -55,17 +60,21 @@ import java.util.concurrent.locks.ReentrantLock;
 public class Monitor {
     private final Ticdc ticdc = new Ticdc();
 
+
     private String url;
 
     private Properties info;
 
     private AtomicReference<java.sql.Connection> conn = new AtomicReference<>();
 
+
     private AtomicReference<PreparedStatement> preparedStatement = new AtomicReference<>();
+
 
     private ScheduledThreadPoolExecutor executor;
 
     private Driver driver;
+
 
     private Properties properties;
 
@@ -87,6 +96,7 @@ public class Monitor {
     private String ticdcACIDIntervalValue;
 
     private String useTicdcACID;
+
 
     public Monitor(Driver driver,String url,Properties info,ScheduledThreadPoolExecutor executor){
         this.driver = driver;
@@ -180,7 +190,6 @@ public class Monitor {
         if(!isRun()){
             return;
         }
-
         if(this.executor != null){
             return;
         }
@@ -199,7 +208,6 @@ public class Monitor {
         this.executor.allowCoreThreadTimeOut(true);
         this.executor.scheduleWithFixedDelay(
                 this::reload, 0, ticdcACIDInterval.get(), TimeUnit.MILLISECONDS);
-
     }
 
     public Ticdc get(){
@@ -244,6 +252,7 @@ public class Monitor {
                     this.ticdc.getGlobalSecondaryTs().set(Long.parseLong(secondaryTs));
                     this.ticdc.getGloballasttime().set(System.currentTimeMillis());
                 }
+
             }else {
                 throw new RuntimeException("secondaryTs is null");
             }

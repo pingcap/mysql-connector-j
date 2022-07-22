@@ -800,8 +800,6 @@ public class StatementImpl implements JdbcStatement {
         JdbcConnection locallyScopedConn = checkClosed();
 
         synchronized (locallyScopedConn.getConnectionMutex()) {
-
-
             if (locallyScopedConn.isReadOnly()) {
                 throw SQLError.createSQLException(Messages.getString("Statement.34") + Messages.getString("Statement.35"),
                         MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, getExceptionInterceptor());
@@ -1253,7 +1251,6 @@ public class StatementImpl implements JdbcStatement {
         synchronized (checkClosed().getConnectionMutex()) {
             JdbcConnection locallyScopedConn = this.connection;
             locallyScopedConn.refreshSnapshot(sql);
-
             checkNullOrEmptyQuery(sql);
 
             resetCancelledState();

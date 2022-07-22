@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2002, 2020, Oracle and/or its affiliates.
  *
@@ -26,11 +27,11 @@
  * this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
  */
-
 package com.tidb.jdbc;
 
 import com.mysql.cj.jdbc.ConnectionImpl;
 import com.tidb.snapshot.Ticdc;
+
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -48,13 +49,16 @@ public class TidbCdcOperate {
 
     private static final String QUERY_CFNAME_SQL = "select cf from `tidb_cdc`.`syncpoint_v1` group by cf";
 
+
     public ConnectionImpl connection;
 
     public Ticdc ticdc;
 
+
     private AtomicReference<PreparedStatement> preparedStatement;
 
     private Boolean closeFlag = true;
+
 
     public TidbCdcOperate(ConnectionImpl connection,Ticdc ticdc){
         this.connection = connection;
@@ -64,6 +68,7 @@ public class TidbCdcOperate {
     public static TidbCdcOperate of(ConnectionImpl connection,Ticdc ticdc){
         return new TidbCdcOperate(connection,ticdc);
     }
+
 
 
 
@@ -94,6 +99,7 @@ public class TidbCdcOperate {
             }
 
         }catch (SQLException e){
+
             //System.out.println("ticdc-refreshSnapshot:"+e);
             throw new RuntimeException(e);
         }
@@ -228,5 +234,6 @@ public class TidbCdcOperate {
                 resultSet.close();
             }
         }
+
     }
 }

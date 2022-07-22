@@ -10,9 +10,11 @@ public class Ticdc {
 
     private AtomicLong name = new AtomicLong(0);
 
+
     private String ticdcCFname;
 
     private String useTicdcACID;
+
 
 
     public AtomicLong getGlobalSecondaryTs() {
@@ -40,6 +42,7 @@ public class Ticdc {
         this.name = name;
     }
 
+
     public String getTicdcCFname() {
         return ticdcCFname;
     }
@@ -55,4 +58,5 @@ public class Ticdc {
     public void setUseTicdcACID(String useTicdcACID) {
         this.useTicdcACID = useTicdcACID;
     }
+
 }
