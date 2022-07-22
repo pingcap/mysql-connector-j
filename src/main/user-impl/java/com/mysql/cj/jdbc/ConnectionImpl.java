@@ -155,6 +155,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         this.ticdc = ticdc;
     }
 
+    /**
+     * manual Transaction refreshSnapshot
+     */
     private void manualTransaction(){
         try {
             TidbCdcOperate.of(this,ticdc).refreshSnapshot();
@@ -167,13 +170,19 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         }
     }
 
+    /**
+     *
+     * Transaction sql Filter
+     * @param sql
+     */
     private void sqlFilter(String sql){
         try {
             sql = sql.trim().toLowerCase();
-            if(sql.startsWith("begin")){
+            if(sql.startsWith("begin") || (sql.contains("start") && sql.contains("transaction"))){
                 manualTransaction();
-            }else if(sql.contains("start") && sql.contains("transaction")){
-                manualTransaction();
+            }else if(sql.startsWith("commit") || sql.startsWith("rollback")){
+                commitFlag.set(true);
+                cacheCommit.set(false);
             }else if(sql.contains("set") && sql.contains("autocommit")){
                 if(sql.contains("0") || sql.contains("off")){
                     setAutoCommit(false);
@@ -183,18 +192,17 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                         commitFlag.set(false);
                     }
                 }
-            }else if(sql.startsWith("commit")){
-                commitFlag.set(true);
-                cacheCommit.set(false);
-            }else if(sql.startsWith("rollback")){
-                commitFlag.set(true);
-                cacheCommit.set(false);
             }
         }catch (Exception e){
             throw new RuntimeException(e);
         }
     }
 
+    /**
+     *
+     * refresh Snapshot flow
+     * @param sql 
+     */
     public void refreshSnapshot(String sql){
         try {
             if(sql == null || sql == ""){
