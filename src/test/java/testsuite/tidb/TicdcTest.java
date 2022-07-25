@@ -56,22 +56,14 @@ public class TicdcTest extends BaseTestCase {
     public void testCdcQuery() throws Exception{
         ConnectionImpl conn1 = (ConnectionImpl) this.conn;
         Map<String, Function<ResultSet,Integer>> sqlFlow = sqlFlow(conn1);
-        try {
-            JDBCRun.of(conn1).multipleRun(sqlFlow,20,5000L);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        JDBCRun.of(conn1).multipleRun(sqlFlow,20,5000L);
     }
 
     @Test
     public void testCdcBaseQuery() throws Exception{
         ConnectionImpl conn1 = (ConnectionImpl) this.conn;
         Map<String, Function<ResultSet,Integer>> sqlFlow = sqlFlow(conn1);
-        try {
-            JDBCRun.of(conn1).multipleRunBase(sqlFlow,20,null);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        JDBCRun.of(conn1).multipleRunBase(sqlFlow,20,null);
     }
 
 
@@ -94,13 +86,9 @@ public class TicdcTest extends BaseTestCase {
                     }
                     return 1;
                 });
-        try {
-            conn.setAutoCommit(false);
-            JDBCRun.of(conn).multipleRun(sqlFlow,20,5000L);
-            conn.commit();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        conn.setAutoCommit(false);
+        JDBCRun.of(conn).multipleRun(sqlFlow,20,5000L);
+        conn.commit();
     }
 
     @Test
@@ -108,12 +96,7 @@ public class TicdcTest extends BaseTestCase {
         ConnectionImpl conn1 = (ConnectionImpl) this.conn;
         Map<String, Function<ResultSet,Integer>> sqlFlow = new HashMap<>();
         sqlFlow.put("begin",null);
-
-        try {
-            JDBCRun.of(conn1).runBase(sqlFlow);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        JDBCRun.of(conn1).runBase(sqlFlow);
     }
 
     @Test
@@ -133,15 +116,9 @@ public class TicdcTest extends BaseTestCase {
                     }
                     return 1;
                 });
-        try {
-            JDBCRun.of(conn).multipleRun(sqlFlow,5,5000L);
-            conn.commit();
-            Thread.sleep(5000L);
-
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        JDBCRun.of(conn).multipleRun(sqlFlow,5,5000L);
+        conn.commit();
+        Thread.sleep(5000L);
     }
 
 
@@ -199,22 +176,13 @@ public class TicdcTest extends BaseTestCase {
                     return 1;
                 });
 
-        try {
-            while (true){
-                JDBCRun.of(conn).multipleRunBase(sqlFlow,2,1000L);
-                JDBCRun.of(conn).runBaseExecute("start transaction");
-                for (int i=0;i<10;i++){
-                    JDBCRun.of(conn).multipleRunBase(sqlFlow1,10,2000L);
-                    JDBCRun.of(conn).runBaseExecute("commit");
-                    //conn.commit();
-                    Thread.sleep(5000L);
-                }
-
-            }
-
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+        JDBCRun.of(conn).multipleRunBase(sqlFlow,2,1000L);
+        JDBCRun.of(conn).runBaseExecute("start transaction");
+        for (int i=0;i<10;i++){
+            JDBCRun.of(conn).multipleRunBase(sqlFlow1,10,2000L);
+            JDBCRun.of(conn).runBaseExecute("commit");
+            //conn.commit();
+            Thread.sleep(5000L);
         }
     }
 
@@ -249,22 +217,16 @@ public class TicdcTest extends BaseTestCase {
                     return 1;
                 });
 
-        try {
-            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-            conn1.setAutoCommit(true);
-            Thread.sleep(5000L);
-            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-            conn1.setAutoCommit(false);
-            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-            Thread.sleep(5000L);
-            conn1.setAutoCommit(true);
-            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-            Thread.sleep(5000L);
-
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+        conn1.setAutoCommit(true);
+        Thread.sleep(5000L);
+        JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+        conn1.setAutoCommit(false);
+        JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+        Thread.sleep(5000L);
+        conn1.setAutoCommit(true);
+        JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+        Thread.sleep(5000L);
     }
 
 
@@ -298,63 +260,46 @@ public class TicdcTest extends BaseTestCase {
                     return 1;
                 });
 
-        try {
-            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-            conn1.setAutoCommit(true);
-            Thread.sleep(5000L);
-            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-            JDBCRun.of(conn).runBaseExecute("start transaction");
-            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-            JDBCRun.of(conn).runBaseExecute("commit");
-            Thread.sleep(5000L);
-            JDBCRun.of(conn).runBaseExecute("begin");
-            JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
-            JDBCRun.of(conn).runBaseExecute("commit");
-
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+        conn1.setAutoCommit(true);
+        Thread.sleep(5000L);
+        JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+        JDBCRun.of(conn).runBaseExecute("start transaction");
+        JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+        JDBCRun.of(conn).runBaseExecute("commit");
+        Thread.sleep(5000L);
+        JDBCRun.of(conn).runBaseExecute("begin");
+        JDBCRun.of(conn).multipleRunBase(sqlFlow1,2,1000L);
+        JDBCRun.of(conn).runBaseExecute("commit");
     }
 
 
     @Test
     public void testSql() throws Exception{
         ConnectionImpl conn1 = (ConnectionImpl) this.conn;
-
-        try {
-            JDBCRun.of(conn1).run("begin");
-            JDBCRun.of(conn1).runBaseExecute("begin");
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        JDBCRun.of(conn1).run("begin");
+        JDBCRun.of(conn1).runBaseExecute("begin");
     }
 
 
     @Test
     public void testInsertSql() throws Exception{
         ConnectionImpl conn1 = (ConnectionImpl) this.conn;
-
-        try {
-            conn1.setAutoCommit(false);
-            JDBCRun.of(conn1).run("update test set id= id + 1");
-            conn1.commit();
-            JDBCRun.of(conn1).run("select id from test",
-                    (ResultSet result)->{
-                        try {
-                            if (result.next()) {
-                                Long id = result.getLong(1);
-                            }
-                        } catch (SQLException e) {
-                            throw new RuntimeException(e);
+        conn1.setAutoCommit(false);
+        JDBCRun.of(conn1).run("update test set id= id + 1");
+        conn1.commit();
+        JDBCRun.of(conn1).run("select id from test",
+                (ResultSet result)->{
+                    try {
+                        if (result.next()) {
+                            Long id = result.getLong(1);
                         }
-                        return 1;
-                    });
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+                        //cdcValueAssert(conn1);
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                    return 1;
+                });
     }
 
 }
