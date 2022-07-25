@@ -181,12 +181,6 @@ public class Monitor {
         return true;
     }
 
-    class ErrHandler implements Thread.UncaughtExceptionHandler {
-        public void uncaughtException(Thread a, Throwable e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     /**
      * create ScheduledThreadPoolExecutor get  SecondaryTs value
      */
@@ -205,10 +199,9 @@ public class Monitor {
                             Thread newThread = new Thread(runnable);
                             newThread.setName(executorName);
                             newThread.setDaemon(true);
-                            newThread.setUncaughtExceptionHandler(new ErrHandler());
                             return newThread;
                         });
-        this.executor.setKeepAliveTime(ticdcACIDInterval.get(), TimeUnit.MILLISECONDS);
+        this.executor.setKeepAliveTime(ticdcACIDInterval.get()*2, TimeUnit.MILLISECONDS);
         this.executor.allowCoreThreadTimeOut(true);
         this.executor.scheduleWithFixedDelay(
                 this::reload, 0, ticdcACIDInterval.get(), TimeUnit.MILLISECONDS);
@@ -235,12 +228,12 @@ public class Monitor {
                     Connection conn = driver.connect(this.url,this.info);
                     conn.setAutoCommit(true);
                     this.conn.set(conn);
+                    connLock.unlock();
                 }
             }
         }catch (SQLException e) {
-            throw new RuntimeException(e);
-        }finally {
             connLock.unlock();
+            throw new RuntimeException(e);
         }
     }
 
@@ -252,13 +245,13 @@ public class Monitor {
             String secondaryTs = TidbCdcOperate.of((ConnectionImpl) conn.get(),ticdc).setPreparedStatement(preparedStatement).getSnapshot();
             if(secondaryTs != null){
                 Long secondaryTsValue = Long.parseLong(secondaryTs);
-                if(ticdc.getGlobalSecondaryTs().get() != secondaryTsValue){
-                    this.ticdcMap.forEach((k,v)->{
+                this.ticdcMap.forEach((k,v)->{
+                    if(k.getGlobalSecondaryTs().get() != secondaryTsValue){
                         k.getGlobalSecondaryTs().set(Long.parseLong(secondaryTs));
                         k.getGloballasttime().set(System.currentTimeMillis());
-                    });
+                    }
+                });
 
-                }
 
             }else {
                 throw new RuntimeException("secondaryTs is null");
