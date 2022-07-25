@@ -62,7 +62,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class Monitor {
     private Ticdc ticdc = new Ticdc();
 
-    private Map<Ticdc,String> ticdcMap = new ConcurrentHashMap<Ticdc, String>();
+    private Map<Ticdc,String> ticdcMap = new ConcurrentHashMap<>();
     private String url;
 
     private Properties info;
