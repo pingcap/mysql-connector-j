@@ -235,7 +235,6 @@ public class Monitor {
                     Connection conn = driver.connect(this.url,this.info);
                     conn.setAutoCommit(true);
                     this.conn.set(conn);
-                    connLock.unlock();
                 }
             }
         }catch (SQLException e) {
