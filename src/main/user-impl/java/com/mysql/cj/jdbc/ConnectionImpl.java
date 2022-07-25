@@ -209,6 +209,25 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         }
     }
 
+    private static Map<String,String> sqlMap = new HashMap<>();
+    static {
+        sqlMap.put("transaction","transaction");
+        sqlMap.put("begin","begin");
+        sqlMap.put("rollback","rollback");
+        sqlMap.put("autocommit","autocommit");
+        sqlMap.put("commit","commit");
+    }
+
+    private Boolean isTransactionSql(String sql){
+        String[] sqlArray = sql.split("\\s+");
+        for (int i=0;i<sqlArray.length;i++){
+            if(sqlMap.containsKey(sqlArray[i])){
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      *
      * Transaction sql flow
@@ -217,6 +236,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     private void transactionFlow(String sql){
         try {
             sql = sql.trim().toLowerCase();
+            if(!isTransactionSql(sql)){
+                return;
+            }
             if(sql.startsWith("begin") || (sql.contains("start") && sql.contains("transaction"))){
                 startTransaction();
             }else if(sql.startsWith("commit") || sql.startsWith("rollback")){
@@ -240,7 +262,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
      */
     public void refreshSnapshot(String sql){
         try {
-            if(sql == null || sql == ""){
+            if(sql == null || "".equals(sql)){
                 return;
             }
             if(sql.contains("`tidb_cdc`.`syncpoint_v1`")){
