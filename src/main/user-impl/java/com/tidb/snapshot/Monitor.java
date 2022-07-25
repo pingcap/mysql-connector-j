@@ -41,7 +41,9 @@ import java.sql.Driver;
 import java.sql.PreparedStatement;
 
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,9 +60,9 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  */
 public class Monitor {
-    private final Ticdc ticdc = new Ticdc();
+    private Ticdc ticdc = new Ticdc();
 
-
+    private Map<Ticdc,String> ticdcMap = new ConcurrentHashMap<Ticdc, String>();
     private String url;
 
     private Properties info;
@@ -121,6 +123,9 @@ public class Monitor {
     public Monitor setInfo(String url,Properties info){
         this.url = url;
         this.info = info;
+        Ticdc ticdc = new Ticdc();
+        this.ticdc = ticdc;
+        ticdcMap.put(ticdc,url);
         parser();
 
         createExecutor();
@@ -245,11 +250,15 @@ public class Monitor {
     public void setGlobalSecondaryTs(){
         try {
             String secondaryTs = TidbCdcOperate.of((ConnectionImpl) conn.get(),ticdc).setPreparedStatement(preparedStatement).getSnapshot();
+            System.out.println("ticdc-setGlobalSecondaryTs:"+secondaryTs);
             if(secondaryTs != null){
                 Long secondaryTsValue = Long.parseLong(secondaryTs);
                 if(ticdc.getGlobalSecondaryTs().get() != secondaryTsValue){
-                    this.ticdc.getGlobalSecondaryTs().set(Long.parseLong(secondaryTs));
-                    this.ticdc.getGloballasttime().set(System.currentTimeMillis());
+                    this.ticdcMap.forEach((k,v)->{
+                        k.getGlobalSecondaryTs().set(Long.parseLong(secondaryTs));
+                        k.getGloballasttime().set(System.currentTimeMillis());
+                    });
+
                 }
 
             }else {

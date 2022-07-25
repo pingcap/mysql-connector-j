@@ -332,4 +332,32 @@ public class TicdcTest extends BaseTestCase {
         }
     }
 
+
+    @Test
+    public void testInsertSql() throws Exception{
+        ConnectionImpl conn1 = (ConnectionImpl) this.conn;
+
+        try {
+            conn1.setAutoCommit(false);
+            JDBCRun.of(conn1).run("update test set id= id + 1");
+            conn1.commit();
+            JDBCRun.of(conn1).run("select id from test",
+                    (ResultSet result)->{
+                        try {
+                            if (result.next()) {
+                                Long id = result.getLong(1);
+                                System.out.println("id="+id);
+                            }
+                            //cdcValueAssert(conn1);
+                        } catch (SQLException e) {
+                            throw new RuntimeException(e);
+                        }
+                        return 1;
+                    });
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }
