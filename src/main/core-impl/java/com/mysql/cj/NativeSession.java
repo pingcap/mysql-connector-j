@@ -521,7 +521,6 @@ public class NativeSession extends CoreSession implements Serializable {
             query.append("\"").append(secondaryTs).append("\"");
             this.protocol.sendCommand(this.commandBuilder.buildComQuery(null, query.toString()), false, 0);
         }catch (Exception e){
-            this.log.logError("ticdc-setSnapshot error:"+e);
             throw ExceptionFactory.createException(e.getMessage(), e);
         }
     }

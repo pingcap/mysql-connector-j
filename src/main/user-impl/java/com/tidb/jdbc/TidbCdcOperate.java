@@ -206,7 +206,6 @@ public class TidbCdcOperate {
             if(cf == null){
                 throw new SQLException("not Found changefeeds task name");
             }
-            //System.out.println("ticdc-cfname:"+cf);
             this.ticdc.setTicdcCFname(cf);
         } catch (SQLException e){
             throw new SQLException(e);
