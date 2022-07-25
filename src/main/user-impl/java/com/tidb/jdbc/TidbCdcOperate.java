@@ -72,10 +72,7 @@ public class TidbCdcOperate {
         if(useTicdcACID == null){
             return false;
         }
-        if(!"true".equals(useTicdcACID)){
-            return false;
-        }
-        return true;
+        return "true".equals(useTicdcACID);
     }
 
     /**
@@ -93,7 +90,7 @@ public class TidbCdcOperate {
                 setSnapshot();
             }
         }catch (SQLException e){
-            throw new RuntimeException(e);
+            throw new SQLException(e);
         }
         return this;
     }
@@ -169,13 +166,17 @@ public class TidbCdcOperate {
         } catch (SQLException e){
             throw new SQLException(e);
         } finally {
-            if(closeFlag){
-                if(preparedStatement != null){
-                    this.preparedStatement.get().close();
+            try {
+                if(closeFlag){
+                    if(preparedStatement != null){
+                        this.preparedStatement.get().close();
+                    }
                 }
-            }
-            if(resultSet != null){
-                resultSet.close();
+                if(resultSet != null){
+                    resultSet.close();
+                }
+            }catch (SQLException e){
+                throw new SQLException(e);
             }
         }
     }

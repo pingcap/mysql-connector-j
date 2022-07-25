@@ -1,15 +1,10 @@
 package testsuite.tidb;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.sql.*;
 import java.util.Map;
 import java.util.function.Function;
 
 public class JDBCRun {
-    private static final Logger log = LoggerFactory.getLogger(JDBCRun.class);
-
     private Connection conn;
 
     public JDBCRun(){
@@ -33,7 +28,6 @@ public class JDBCRun {
             ResultSet result = ps.executeQuery();
             fun.apply(result);
         }catch (SQLException e) {
-            log.error("PrepareTest error",e);
             throw new RuntimeException(e);
         }
     }
@@ -41,9 +35,7 @@ public class JDBCRun {
     public void run(String sql){
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             Boolean state = ps.execute();
-            System.out.println("run state:"+state);
         }catch (SQLException e) {
-            log.error("PrepareTest error",e);
             throw new RuntimeException(e);
         }
     }
@@ -77,19 +69,22 @@ public class JDBCRun {
                 fun.apply(result);
             }
         } catch (SQLException e) {
-            log.error("Statement error",e);
             throw new RuntimeException(e);
         }finally {
             if (result != null) {
                 try {
                     result.close();
-                } catch (SQLException sqlEx) { } // ignore
+                } catch (SQLException sqlEx) {
+                    throw new RuntimeException(sqlEx);
+                }
                 result = null;
             }
             if (ps != null) {
                 try {
                     ps.close();
-                } catch (SQLException sqlEx) { } // ignore
+                } catch (SQLException sqlEx) {
+                    throw new RuntimeException(sqlEx);
+                }
                 ps = null;
             }
         }
@@ -101,21 +96,23 @@ public class JDBCRun {
         try {
             ps = conn.createStatement();
             Boolean state = ps.execute(sql);
-            System.out.println("runBaseExecute state:"+state);
         } catch (SQLException e) {
-            log.error("Statement error",e);
             throw new RuntimeException(e);
         }finally {
             if (result != null) {
                 try {
                     result.close();
-                } catch (SQLException sqlEx) { } // ignore
+                } catch (SQLException sqlEx) {
+                    throw new RuntimeException(sqlEx);
+                }
                 result = null;
             }
             if (ps != null) {
                 try {
                     ps.close();
-                } catch (SQLException sqlEx) { } // ignore
+                } catch (SQLException sqlEx) {
+                    throw new RuntimeException(sqlEx);
+                }
                 ps = null;
             }
         }

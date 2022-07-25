@@ -239,8 +239,9 @@ public class Monitor {
                 }
             }
         }catch (SQLException e) {
-            connLock.unlock();
             throw new RuntimeException(e);
+        }finally {
+            connLock.unlock();
         }
     }
 

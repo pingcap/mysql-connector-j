@@ -166,7 +166,6 @@ public class TicdcTest extends BaseTestCase {
                     try {
                         if (result.next()) {
                             String value = result.getString("Value");
-                            System.out.println("value="+value);
                         }
                         cdcValueAssert(conn1);
                     } catch (SQLException e) {
@@ -346,9 +345,7 @@ public class TicdcTest extends BaseTestCase {
                         try {
                             if (result.next()) {
                                 Long id = result.getLong(1);
-                                System.out.println("id="+id);
                             }
-                            //cdcValueAssert(conn1);
                         } catch (SQLException e) {
                             throw new RuntimeException(e);
                         }
