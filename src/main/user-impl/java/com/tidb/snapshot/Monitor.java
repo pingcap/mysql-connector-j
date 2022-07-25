@@ -250,7 +250,6 @@ public class Monitor {
     public void setGlobalSecondaryTs(){
         try {
             String secondaryTs = TidbCdcOperate.of((ConnectionImpl) conn.get(),ticdc).setPreparedStatement(preparedStatement).getSnapshot();
-            System.out.println("ticdc-setGlobalSecondaryTs:"+secondaryTs);
             if(secondaryTs != null){
                 Long secondaryTsValue = Long.parseLong(secondaryTs);
                 if(ticdc.getGlobalSecondaryTs().get() != secondaryTsValue){
