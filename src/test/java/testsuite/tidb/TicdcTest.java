@@ -8,6 +8,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,18 +21,6 @@ public class TicdcTest extends BaseTestCase {
 
     private Long secondaryTsValue = 0L;
 
-    private void cdcValueAssert(ConnectionImpl conn1){
-        Long globalSecondaryTs = conn1.getTicdc().getGlobalSecondaryTs().get();
-        Long secondaryTs = conn1.getSecondaryTs();
-        String cfName = conn1.getTicdc().getTicdcCFname();
-        assertTrue(cfName != null,"TicdcCFname 不符合预期");
-        assertTrue(globalSecondaryTs != 0,  "globalSecondaryTs不符合预期");
-        assertTrue(secondaryTs != 0,  "secondaryTs 不符合预期");
-        globalSecondaryTsValue = globalSecondaryTs;
-        secondaryTsValue = secondaryTs;
-
-    }
-
     private Map<String, Function<ResultSet,Integer>> sqlFlow(ConnectionImpl conn1){
         Map<String, Function<ResultSet,Integer>> sqlFlow = new HashMap<>();
         sqlFlow.put(QUERY_SQL,
@@ -39,11 +28,8 @@ public class TicdcTest extends BaseTestCase {
                     try {
                         if (result.next()) {
                             Long sum = result.getLong(1);
-                            if(sum == 100000){
-                                assertTrue(sum == 100000,"符合预期，大于等于上一个值");
-                            }
+                            assertTrue(sum != null,"符合预期，大于等于上一个值");
                         }
-                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
@@ -56,14 +42,14 @@ public class TicdcTest extends BaseTestCase {
     public void testCdcQuery() throws Exception{
         ConnectionImpl conn1 = (ConnectionImpl) this.conn;
         Map<String, Function<ResultSet,Integer>> sqlFlow = sqlFlow(conn1);
-        JDBCRun.of(conn1).multipleRun(sqlFlow,20,5000L);
+        JDBCRun.of(conn1).multipleRun(sqlFlow,5,1000L);
     }
 
     @Test
     public void testCdcBaseQuery() throws Exception{
         ConnectionImpl conn1 = (ConnectionImpl) this.conn;
         Map<String, Function<ResultSet,Integer>> sqlFlow = sqlFlow(conn1);
-        JDBCRun.of(conn1).multipleRunBase(sqlFlow,20,null);
+        JDBCRun.of(conn1).multipleRunBase(sqlFlow,5,null);
     }
 
 
@@ -80,45 +66,54 @@ public class TicdcTest extends BaseTestCase {
                                 assertTrue(sum == 100000,"符合预期，大于等于上一个值");
                             }
                         }
-                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
                     return 1;
                 });
         conn.setAutoCommit(false);
-        JDBCRun.of(conn).multipleRun(sqlFlow,20,5000L);
+        JDBCRun.of(conn).multipleRun(sqlFlow,5,5000L);
         conn.commit();
     }
 
     @Test
-    public void testCdcUserTransactionQuery() throws Exception{
+    public void testAutoCommit() throws Exception{
         ConnectionImpl conn1 = (ConnectionImpl) this.conn;
-        Map<String, Function<ResultSet,Integer>> sqlFlow = new HashMap<>();
-        sqlFlow.put("begin",null);
-        JDBCRun.of(conn1).runBase(sqlFlow);
-    }
-
-    @Test
-    public void testCdcBigTransactionQuery() throws Exception{
-        ConnectionImpl conn1 = (ConnectionImpl) this.conn;
-        conn1.setAutoCommit(false);
+        AtomicReference<Long> gId = new AtomicReference<>(0L);
+        AtomicReference<Boolean> start = new AtomicReference<>(true);
         Map<String, Function<ResultSet,Integer>> sqlFlow = new HashMap<>();
         sqlFlow.put("select * from test",
                 (ResultSet result)->{
                     try {
                         if (result.next()) {
                             Long id = result.getLong(1);
+                            if(!start.get()){
+                                assertTrue(id == gId.get(),"id 不符合预期");
+                            }
+                            start.set(false);
+                            gId.set(id);
+
                         }
-                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
                     return 1;
                 });
-        JDBCRun.of(conn).multipleRun(sqlFlow,5,5000L);
-        conn.commit();
-        Thread.sleep(5000L);
+        conn1.setAutoCommit(false);
+        JDBCRun.of(conn1).multipleRun(sqlFlow,10,1000L);
+        conn1.commit();
+        start.set(true);
+        Thread.sleep(1000L);
+        conn1.setAutoCommit(false);
+        JDBCRun.of(conn1).multipleRun(sqlFlow,10,1000L);
+        conn1.commit();
+        start.set(true);
+        Thread.sleep(1000L);
+        conn1.setAutoCommit(false);
+        JDBCRun.of(conn1).multipleRun(sqlFlow,10,1000L);
+        conn1.commit();
+        start.set(true);
+        Thread.sleep(1000L);
     }
 
 
@@ -132,7 +127,6 @@ public class TicdcTest extends BaseTestCase {
                         if (result.next()) {
                             Long id = result.getLong(1);
                         }
-                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
@@ -144,7 +138,6 @@ public class TicdcTest extends BaseTestCase {
                         if (result.next()) {
                             String value = result.getString("Value");
                         }
-                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
@@ -157,7 +150,6 @@ public class TicdcTest extends BaseTestCase {
                         if (result.next()) {
                             String  val= result.getString("Value") ;
                         }
-                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
@@ -169,7 +161,6 @@ public class TicdcTest extends BaseTestCase {
                         if (result.next()) {
                             Long id = result.getLong(1);
                         }
-                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
@@ -178,12 +169,15 @@ public class TicdcTest extends BaseTestCase {
 
         JDBCRun.of(conn).multipleRunBase(sqlFlow,2,1000L);
         JDBCRun.of(conn).runBaseExecute("start transaction");
-        for (int i=0;i<10;i++){
-            JDBCRun.of(conn).multipleRunBase(sqlFlow1,10,2000L);
-            JDBCRun.of(conn).runBaseExecute("commit");
-            //conn.commit();
-            Thread.sleep(5000L);
-        }
+        JDBCRun.of(conn).multipleRunBase(sqlFlow1,3,1000L);
+        JDBCRun.of(conn).runBaseExecute("commit");
+        //conn.commit();
+        Thread.sleep(1000L);
+        JDBCRun.of(conn).runBaseExecute("start transaction");
+        JDBCRun.of(conn).multipleRunBase(sqlFlow1,3,1000L);
+        JDBCRun.of(conn).runBaseExecute("commit");
+        //conn.commit();
+        Thread.sleep(1000L);
     }
 
 
@@ -198,7 +192,6 @@ public class TicdcTest extends BaseTestCase {
                         if (result.next()) {
                             String  val= result.getString("Value") ;
                         }
-                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
@@ -210,7 +203,6 @@ public class TicdcTest extends BaseTestCase {
                         if (result.next()) {
                             Long id = result.getLong(1);
                         }
-                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
@@ -241,7 +233,6 @@ public class TicdcTest extends BaseTestCase {
                         if (result.next()) {
                             String  val= result.getString("Value") ;
                         }
-                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
@@ -253,7 +244,6 @@ public class TicdcTest extends BaseTestCase {
                         if (result.next()) {
                             Long id = result.getLong(1);
                         }
-                        cdcValueAssert(conn1);
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
@@ -282,24 +272,23 @@ public class TicdcTest extends BaseTestCase {
     }
 
 
-    @Test
-    public void testInsertSql() throws Exception{
-        ConnectionImpl conn1 = (ConnectionImpl) this.conn;
-        conn1.setAutoCommit(false);
-        JDBCRun.of(conn1).run("update test set id= id + 1");
-        conn1.commit();
-        JDBCRun.of(conn1).run("select id from test",
-                (ResultSet result)->{
-                    try {
-                        if (result.next()) {
-                            Long id = result.getLong(1);
-                        }
-                        //cdcValueAssert(conn1);
-                    } catch (SQLException e) {
-                        throw new RuntimeException(e);
-                    }
-                    return 1;
-                });
-    }
+//    @Test
+//    public void testInsertSql() throws Exception{
+//        ConnectionImpl conn1 = (ConnectionImpl) this.conn;
+//        conn1.setAutoCommit(false);
+//        JDBCRun.of(conn1).run("update test set id= id + 1");
+//        conn1.commit();
+//        JDBCRun.of(conn1).run("select id from test",
+//                (ResultSet result)->{
+//                    try {
+//                        if (result.next()) {
+//                            Long id = result.getLong(1);
+//                        }
+//                    } catch (SQLException e) {
+//                        throw new RuntimeException(e);
+//                    }
+//                    return 1;
+//                });
+//    }
 
 }

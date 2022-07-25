@@ -47,6 +47,7 @@ import java.util.Stack;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -121,6 +122,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
      * AutoCommit state
      */
     private AtomicBoolean isSessAutoCommit = new AtomicBoolean(false);
+
+    private AtomicInteger autoCommitState = new AtomicInteger(0);
+
 
     private Ticdc ticdc;
 
@@ -941,6 +945,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
                 this.session.execSQL(null, "commit", -1, null, false, this.nullStatementResultSetFactory, null, false);
                 isTxnStart.set(true);
+                autoCommitState.set(1);
             } catch (SQLException sqlException) {
                 if (MysqlErrorNumbers.SQL_STATE_COMMUNICATION_LINK_FAILURE.equals(sqlException.getSQLState())) {
                     throw SQLError.createSQLException(Messages.getString("Connection.4"), MysqlErrorNumbers.SQL_STATE_TRANSACTION_RESOLUTION_UNKNOWN,
@@ -2193,11 +2198,19 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                             null, false);
                 }
                 if(!autoCommitFlag){
-                    TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+                    if(autoCommitState.get() == 1 || autoCommitState.get() == 0){
+                        TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+                    }
+                }
+                if(autoCommitFlag){
+                    autoCommitState.set(1);
+                }else {
+                    autoCommitState.set(2);
                 }
                 if(isTxnStart.get()){
                     isTxnStart.set(false);
                 }
+
             } catch (CJCommunicationsException e) {
                 throw e;
             } catch (CJException e) {
