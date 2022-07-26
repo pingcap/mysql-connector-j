@@ -36,6 +36,8 @@ public class JDBCRun {
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             Boolean state = ps.execute();
         }catch (SQLException e) {
+            e.printStackTrace();
+            System.out.println(e.getMessage());
             throw new RuntimeException(e);
         }
     }
@@ -49,12 +51,12 @@ public class JDBCRun {
     public void multipleRun(Map<String,Function<ResultSet,Integer>> sqlFlow,int count,Long timeRun){
         for(int i=0;i<count;i++){
             run(sqlFlow);
-            try {
-                if(timeRun != null){
+            if(timeRun != null){
+                try {
                     Thread.sleep(timeRun);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
             }
         }
     }
