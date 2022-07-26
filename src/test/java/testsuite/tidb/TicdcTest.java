@@ -12,15 +12,12 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
-import static java.lang.Thread.sleep;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TicdcTest extends BaseTestCase {
@@ -28,8 +25,6 @@ public class TicdcTest extends BaseTestCase {
     private Long timeRun = 500L;
 
     private Integer count = 5;
-
-    ExecutorService executorService = Executors.newFixedThreadPool(10);
 
     private Map<String, Function<ResultSet,Integer>> sqlFlow(AtomicReference<Long> gId,AtomicReference<Boolean> start){
         Map<String, Function<ResultSet,Integer>> sqlFlow = new HashMap<>();
@@ -60,7 +55,6 @@ public class TicdcTest extends BaseTestCase {
                     try {
                         if (result.next()) {
                             Long id = result.getLong(1);
-                            System.out.println(id);
                         }
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
@@ -193,6 +187,25 @@ public class TicdcTest extends BaseTestCase {
         JDBCRun.of(conn1).runBaseExecute("start transaction");
         JDBCRun.of(conn1).multipleRunBase(sqlFlow,count,timeRun);
         JDBCRun.of(conn1).runBaseExecute("commit");
+        start.set(true);
+        conn1.close();
+    }
+
+    @Test
+    public void testPreparedTransactionQuery() throws Exception{
+        ConnectionImpl conn1 = getSnapshotConn();
+
+        AtomicReference<Long> gId = new AtomicReference<>(0L);
+        AtomicReference<Boolean> start = new AtomicReference<>(true);
+        Map<String, Function<ResultSet,Integer>> sqlFlow = sqlFlow(gId,start);
+        JDBCRun.of(conn1).multipleRun(sqlFlow,count,timeRun);
+        JDBCRun.of(conn1).run("start transaction");
+        JDBCRun.of(conn1).multipleRun(sqlFlow,count,timeRun);
+        JDBCRun.of(conn1).run("commit");
+        start.set(true);
+        JDBCRun.of(conn1).run("start transaction");
+        JDBCRun.of(conn1).multipleRun(sqlFlow,count,timeRun);
+        JDBCRun.of(conn1).run("commit");
         start.set(true);
         conn1.close();
     }
