@@ -202,10 +202,12 @@ public class TicdcTest extends BaseTestCase {
         JDBCRun.of(conn1).run("start transaction");
         JDBCRun.of(conn1).multipleRun(sqlFlow,count,timeRun);
         JDBCRun.of(conn1).run("commit");
+        System.out.println("ticdc:"+conn1.getTicdc().getGlobalSecondaryTs() + "-" + conn1.getSecondaryTs());
         start.set(true);
         JDBCRun.of(conn1).run("start transaction");
         JDBCRun.of(conn1).multipleRun(sqlFlow,count,timeRun);
         JDBCRun.of(conn1).run("commit");
+        System.out.println("ticdc:"+conn1.getTicdc().getGlobalSecondaryTs() + "-" + conn1.getSecondaryTs());
         start.set(true);
         conn1.close();
     }
