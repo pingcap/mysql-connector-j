@@ -297,7 +297,8 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
         synchronized (checkClosed().getConnectionMutex()) {
 
             JdbcConnection locallyScopedConn = this.connection;
-
+            String sql = getPreparedSql();
+            locallyScopedConn.refreshSnapshot(sql);
             if (!this.doPingInstead && !checkReadOnlySafeStatement()) {
                 throw SQLError.createSQLException(Messages.getString("PreparedStatement.20") + Messages.getString("PreparedStatement.21"),
                         MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, this.exceptionInterceptor);
@@ -623,7 +624,8 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
     protected long[] executeBatchedInserts(int batchTimeout) throws SQLException {
         synchronized (checkClosed().getConnectionMutex()) {
             JdbcConnection locallyScopedConn = this.connection;
-
+            String sql = getPreparedSql();
+            locallyScopedConn.refreshSnapshot(sql);
             int numBatchedArgs = this.query.getBatchedArgs().size();
 
             if (this.retrieveGeneratedKeys) {
@@ -874,7 +876,7 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
         synchronized (checkClosed().getConnectionMutex()) {
             try {
 
-                // TODO this.connection.refreshSnapshot();
+
                 JdbcConnection locallyScopedConnection = this.connection;
 
                 ((PreparedQuery) this.query).getQueryBindings()
@@ -922,7 +924,8 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
         synchronized (checkClosed().getConnectionMutex()) {
 
             JdbcConnection locallyScopedConn = this.connection;
-            // TODO this.connection.refreshSnapshot();
+            String sql = getPreparedSql();
+            this.connection.refreshSnapshot(sql);
             if (!this.doPingInstead) {
                 QueryReturnType queryReturnType = getQueryInfo().getQueryReturnType();
                 if (queryReturnType != QueryReturnType.PRODUCES_RESULT_SET && queryReturnType != QueryReturnType.MAY_PRODUCE_RESULT_SET) {

@@ -519,10 +519,9 @@ public class NativeSession extends CoreSession implements Serializable {
         try {
             StringBuilder query = new StringBuilder("SET @@tidb_snapshot = ");
             query.append("\"").append(secondaryTs).append("\"");
-            System.out.println("Snapshot-setSnapshot:"+query.toString());
             this.protocol.sendCommand(this.commandBuilder.buildComQuery(null, query.toString()), false, 0);
         }catch (Exception e){
-            System.out.println("setSnapshot error"+e);
+            throw ExceptionFactory.createException(e.getMessage(), e);
         }
     }
 
