@@ -210,7 +210,8 @@ See also com.mysql.cj.conf.PropertyDefinitions.SYSP_* variables for other test o
               value="${com.mysql.cj.build.driver.version.series}.${com.mysql.cj.build.driver.version.subminor}" />
     <property name="com.mysql.cj.build.driver.version" value="${com.mysql.cj.build.driver.version.numeric}${com.mysql.cj.build.driver.version.status}" />
     <property name="com.mysql.cj.build.driver.version.extra" value="" />
-    <property name="com.mysql.cj.build.driver.version.snapshot" value="-SNAPSHOT" />
+    <!-- -SNAPSHOT -TICDC -SM3 -->
+    <property name="com.mysql.cj.build.driver.version.snapshot" value="-SM3" />
     <property name="com.mysql.cj.build.driver.version.full"
               value="${com.mysql.cj.build.driver.version}${com.mysql.cj.build.driver.version.extra}${com.mysql.cj.build.driver.version.snapshot}" />
 

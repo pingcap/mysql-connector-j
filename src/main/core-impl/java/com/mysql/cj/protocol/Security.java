@@ -35,6 +35,7 @@ import java.security.NoSuchAlgorithmException;
 
 import com.mysql.cj.exceptions.AssertionFailedException;
 import com.mysql.cj.util.StringUtils;
+import org.bouncycastle.crypto.digests.SM3Digest;
 
 /**
  * Methods for doing secure authentication with MySQL-4.1 and newer.
@@ -177,6 +178,14 @@ public class Security {
         xorString(dig1, mysqlScrambleBuff, scramble1, CACHING_SHA2_DIGEST_LENGTH);
 
         return mysqlScrambleBuff;
+    }
+
+    public static byte[] scrambleSm3(byte[] srcData){
+        SM3Digest digest = new SM3Digest();
+        digest.update(srcData, 0, srcData.length);
+        byte[] hash = new byte[digest.getDigestSize()];
+        digest.doFinal(hash, 0);
+        return hash;
     }
 
     /**
