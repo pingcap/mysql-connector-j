@@ -925,7 +925,7 @@ public class ClientPreparedStatement extends com.mysql.cj.jdbc.StatementImpl imp
 
             JdbcConnection locallyScopedConn = this.connection;
             String sql = getPreparedSql();
-            this.connection.refreshSnapshot(sql);
+            locallyScopedConn.refreshSnapshot(sql);
             if (!this.doPingInstead) {
                 QueryReturnType queryReturnType = getQueryInfo().getQueryReturnType();
                 if (queryReturnType != QueryReturnType.PRODUCES_RESULT_SET && queryReturnType != QueryReturnType.MAY_PRODUCE_RESULT_SET) {
