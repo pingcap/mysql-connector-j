@@ -278,7 +278,7 @@ public class TicdcTest extends BaseTestCase {
             }
         }
         try {
-            return (ConnectionImpl) this.getConnectionWithProps(jdbcUrl,info);
+            return (ConnectionImpl) this.getConnectionWithProps(url[0],info);
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
