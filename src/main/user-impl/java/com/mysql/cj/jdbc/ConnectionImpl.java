@@ -269,7 +269,6 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
      * @param sql 
      */
     public void refreshSnapshot(String sql){
-
         if(!this.useTicdcACID){
             return;
         }
@@ -1821,7 +1820,6 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             } else {
                 pStmt = (ClientPreparedStatement) clientPrepareStatement(nativeSql, resultSetType, resultSetConcurrency, false);
             }
-
             return pStmt;
         }
     }
