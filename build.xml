@@ -203,18 +203,27 @@ See also com.mysql.cj.conf.PropertyDefinitions.SYSP_* variables for other test o
     <property name="com.mysql.cj.build.driver.version.major" value="8" />
     <property name="com.mysql.cj.build.driver.version.minor" value="0" />
     <property name="com.mysql.cj.build.driver.version.subminor" value="29" />
-    <property name="com.mysql.cj.build.driver.version.status" value="1" />
+    <property name="com.mysql.cj.build.driver.version.status" value="" />
+    <property name="com.mysql.cj.build.driver.version.tidb" value="-tidb" />
+    <property name="com.mysql.cj.build.driver.tidb.version.major" value="1" />
+    <property name="com.mysql.cj.build.driver.tidb.version.minor" value="0" />
+    <property name="com.mysql.cj.build.driver.tidb.version.subminor" value="0" />
 
     <property name="com.mysql.cj.build.driver.version.series" value="${com.mysql.cj.build.driver.version.major}.${com.mysql.cj.build.driver.version.minor}" />
     <property name="com.mysql.cj.build.driver.version.numeric"
               value="${com.mysql.cj.build.driver.version.series}.${com.mysql.cj.build.driver.version.subminor}" />
-    <property name="com.mysql.cj.build.driver.version" value="${com.mysql.cj.build.driver.version.numeric}.${com.mysql.cj.build.driver.version.status}" />
+    <property name="com.mysql.cj.build.driver.tidb.version.series" value="${com.mysql.cj.build.driver.tidb.version.major}.${com.mysql.cj.build.driver.tidb.version.minor}" />
+    <property name="com.mysql.cj.build.driver.tidb.version.numeric"
+              value="${com.mysql.cj.build.driver.tidb.version.series}.${com.mysql.cj.build.driver.tidb.version.subminor}" />
+
+    <property name="com.mysql.cj.build.driver.version" value="${com.mysql.cj.build.driver.version.numeric}${com.mysql.cj.build.driver.version.status}" />
     <property name="com.mysql.cj.build.driver.version.extra" value="" />
     <!-- -SNAPSHOT  -->
-    <property name="com.mysql.cj.build.driver.version.snapshot" value="-tidb" />
+    <property name="com.mysql.cj.build.driver.version.snapshot" value="" />
+    <property name="com.mysql.cj.build.driver.tidb.version.full"
+              value="${com.mysql.cj.build.driver.version.tidb}-${com.mysql.cj.build.driver.tidb.version.numeric}" />
     <property name="com.mysql.cj.build.driver.version.full"
-              value="${com.mysql.cj.build.driver.version}${com.mysql.cj.build.driver.version.extra}${com.mysql.cj.build.driver.version.snapshot}" />
-
+              value="${com.mysql.cj.build.driver.version}${com.mysql.cj.build.driver.version.extra}${com.mysql.cj.build.driver.tidb.version.full}${com.mysql.cj.build.driver.version.snapshot}" />
     <property name="com.mysql.cj.build.driver.displayName" value="MySQL Connector/J" />
     <property name="com.mysql.cj.build.driver.name" value="mysql-connector-java" />
     <property name="com.mysql.cj.build.driver.extraName" value="" />
