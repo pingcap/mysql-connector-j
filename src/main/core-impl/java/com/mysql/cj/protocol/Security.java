@@ -32,15 +32,23 @@ package com.mysql.cj.protocol;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 
 import com.mysql.cj.exceptions.AssertionFailedException;
 import com.mysql.cj.util.StringUtils;
 import org.bouncycastle.crypto.digests.SM3Digest;
+import org.bouncycastle.crypto.macs.HMac;
+import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 /**
  * Methods for doing secure authentication with MySQL-4.1 and newer.
  */
 public class Security {
+
+    static {
+        java.security.Security.addProvider(new BouncyCastleProvider());
+    }
 
     private static int CACHING_SHA2_DIGEST_LENGTH = 32;
 
@@ -186,6 +194,26 @@ public class Security {
         byte[] hash = new byte[digest.getDigestSize()];
         digest.doFinal(hash, 0);
         return hash;
+    }
+
+    public static byte[] hmac(byte[] key, byte[] srcData) {
+        KeyParameter keyParameter = new KeyParameter(key);
+        SM3Digest digest = new SM3Digest();
+        HMac mac = new HMac(digest);
+        mac.init(keyParameter);
+        mac.update(srcData, 0, srcData.length);
+        byte[] result = new byte[mac.getMacSize()];
+        mac.doFinal(result, 0);
+        return result;
+    }
+
+    public static boolean verify(byte[] srcData, byte[] sm3Hash) {
+        byte[] newHash = scrambleSm3(srcData);
+        if (Arrays.equals(newHash, sm3Hash)) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /**

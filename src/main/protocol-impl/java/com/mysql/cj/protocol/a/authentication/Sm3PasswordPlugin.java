@@ -42,11 +42,9 @@ import com.mysql.cj.protocol.Security;
 import com.mysql.cj.protocol.a.NativeConstants;
 import com.mysql.cj.protocol.a.NativePacketPayload;
 import com.mysql.cj.util.StringUtils;
+import org.bouncycastle.pqc.math.linearalgebra.ByteUtils;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.List;
 
 public class Sm3PasswordPlugin implements AuthenticationPlugin<NativePacketPayload> {
@@ -55,21 +53,11 @@ public class Sm3PasswordPlugin implements AuthenticationPlugin<NativePacketPaylo
     protected Protocol<NativePacketPayload> protocol = null;
     protected MysqlCallbackHandler usernameCallbackHandler = null;
     protected String password = null;
-    protected String seed = null;
-    protected boolean publicKeyRequested = false;
-    protected String publicKeyString = null;
-    protected RuntimeProperty<String> serverRSAPublicKeyFile = null;
-
     @Override
     public void init(Protocol<NativePacketPayload> prot, MysqlCallbackHandler cbh) {
         this.protocol = prot;
         this.usernameCallbackHandler = cbh;
-        this.serverRSAPublicKeyFile = this.protocol.getPropertySet().getStringProperty(PropertyKey.serverRSAPublicKeyFile);
 
-        String pkURL = this.serverRSAPublicKeyFile.getValue();
-        if (pkURL != null) {
-            this.publicKeyString = readRSAKey(pkURL, this.protocol.getPropertySet(), this.protocol.getExceptionInterceptor());
-        }
     }
 
     public void destroy() {
@@ -77,10 +65,6 @@ public class Sm3PasswordPlugin implements AuthenticationPlugin<NativePacketPaylo
         this.protocol = null;
         this.usernameCallbackHandler = null;
         this.password = null;
-        this.seed = null;
-        this.publicKeyRequested = false;
-        this.publicKeyString = null;
-        this.serverRSAPublicKeyFile = null;
     }
 
     public String getProtocolPluginName() {
@@ -122,35 +106,24 @@ public class Sm3PasswordPlugin implements AuthenticationPlugin<NativePacketPaylo
                     packet.setPosition(0);
                     toServer.add(packet);
 
-                } else if (this.serverRSAPublicKeyFile.getValue() != null) {
-                    // encrypt with given key, don't use "Public Key Retrieval"
-                    this.seed = fromServer.readString(NativeConstants.StringSelfDataType.STRING_TERM, null);
-                    NativePacketPayload packet = new NativePacketPayload(encryptPassword());
-                    toServer.add(packet);
-
-                } else {
-                    if (!this.protocol.getPropertySet().getBooleanProperty(PropertyKey.allowPublicKeyRetrieval).getValue()) {
-                        throw ExceptionFactory.createException(UnableToConnectException.class, Messages.getString("Sha256PasswordPlugin.2"),
-                                this.protocol.getExceptionInterceptor());
-
-                    }
+                }  else {
+//                    if (!this.protocol.getPropertySet().getBooleanProperty(PropertyKey.allowPublicKeyRetrieval).getValue()) {
+//                        throw ExceptionFactory.createException(UnableToConnectException.class, Messages.getString("Sm3PasswordPlugin.2"),
+//                                this.protocol.getExceptionInterceptor());
+//
+//                    }
 
                     // We must request the public key from the server to encrypt the password
-                    if (this.publicKeyRequested && fromServer.getPayloadLength() > NativeConstants.SEED_LENGTH + 1) { // auth data is null terminated
+                    if (fromServer.getPayloadLength() > 0) { // auth data is null terminated
                         // Servers affected by Bug#70865 could send Auth Switch instead of key after Public Key Retrieval,
                         // so we check payload length to detect that.
-
                         // read key response
-                        this.publicKeyString = fromServer.readString(NativeConstants.StringSelfDataType.STRING_TERM, null);
                         NativePacketPayload packet = new NativePacketPayload(encryptPassword());
                         toServer.add(packet);
-                        this.publicKeyRequested = false;
                     } else {
                         // build and send Public Key Retrieval packet
-                        this.seed = fromServer.readString(NativeConstants.StringSelfDataType.STRING_TERM, null);
                         NativePacketPayload packet = new NativePacketPayload(new byte[] { 1 });
                         toServer.add(packet);
-                        this.publicKeyRequested = true;
                     }
                 }
             } catch (CJException e) {
@@ -161,49 +134,16 @@ public class Sm3PasswordPlugin implements AuthenticationPlugin<NativePacketPaylo
     }
 
     protected byte[] encryptPassword() {
-        byte[] input = this.password != null
-                ? StringUtils.getBytesNullTerminated(this.password, this.protocol.getServerSession().getCharsetSettings().getPasswordCharacterEncoding())
-                : new byte[] { 0 };
-        return Security.scrambleSm3(input);
-    }
-
-    protected static String readRSAKey(String pkPath, PropertySet propertySet, ExceptionInterceptor exceptionInterceptor) {
-        String res = null;
-        byte[] fileBuf = new byte[2048];
-
-        BufferedInputStream fileIn = null;
-
         try {
-            File f = new File(pkPath);
-            String canonicalPath = f.getCanonicalPath();
-            fileIn = new BufferedInputStream(new FileInputStream(canonicalPath));
-
-            int bytesRead = 0;
-
-            StringBuilder sb = new StringBuilder();
-            while ((bytesRead = fileIn.read(fileBuf)) != -1) {
-                sb.append(StringUtils.toAsciiString(fileBuf, 0, bytesRead));
-            }
-            res = sb.toString();
-
-        } catch (IOException ioEx) {
-
-            throw ExceptionFactory.createException(WrongArgumentException.class,
-                    Messages.getString("Sm3PasswordPlugin.0",
-                            propertySet.getBooleanProperty(PropertyKey.paranoid).getValue() ? new Object[] { "" } : new Object[] { "'" + pkPath + "'" }),
-                    exceptionInterceptor);
-
-        } finally {
-            if (fileIn != null) {
-                try {
-                    fileIn.close();
-                } catch (IOException e) {
-                    throw ExceptionFactory.createException(Messages.getString("Sm3PasswordPlugin.1"), e, exceptionInterceptor);
-                }
-            }
+            byte[] input = this.password != null
+                    ? this.password.getBytes(this.protocol.getServerSession().getCharsetSettings().getPasswordCharacterEncoding())
+                    : new byte[] { 0 };
+            byte[] hashArray = Security.scrambleSm3(input);
+            System.out.println("rs : " + Security.verify(input,hashArray) + " src :" + this.password + " hash : " + ByteUtils.toHexString(hashArray));
+            return hashArray;
+        } catch (UnsupportedEncodingException e) {
+            throw ExceptionFactory.createException(e.getMessage(), e, this.protocol.getExceptionInterceptor());
         }
-
-        return res;
     }
 
 }
