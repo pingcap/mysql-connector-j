@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2022, Oracle and/or its affiliates.
+ * Copyright (c) 2012, 2022, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License, version 2.0, as published by the
@@ -31,24 +31,24 @@ package com.mysql.cj.protocol.a.authentication;
 
 import com.mysql.cj.callback.MysqlCallbackHandler;
 import com.mysql.cj.callback.UsernameCallback;
-import com.mysql.cj.exceptions.CJException;
-import com.mysql.cj.exceptions.ExceptionFactory;
+import com.mysql.cj.exceptions.*;
 import com.mysql.cj.protocol.AuthenticationPlugin;
 import com.mysql.cj.protocol.Protocol;
 import com.mysql.cj.protocol.Security;
+import com.mysql.cj.protocol.a.NativeConstants;
 import com.mysql.cj.protocol.a.NativePacketPayload;
 import com.mysql.cj.util.StringUtils;
 import org.bouncycastle.pqc.math.linearalgebra.ByteUtils;
 
+import java.io.*;
 import java.util.List;
 
-public class Sm3PasswordPlugin implements AuthenticationPlugin<NativePacketPayload> {
-    public static String PLUGIN_NAME = "sm3_password";
+public class Sm31PasswordPlugin implements AuthenticationPlugin<NativePacketPayload> {
+    public static String PLUGIN_NAME = "sm31_password";
 
     protected Protocol<NativePacketPayload> protocol = null;
     protected MysqlCallbackHandler usernameCallbackHandler = null;
     protected String password = null;
-
     @Override
     public void init(Protocol<NativePacketPayload> prot, MysqlCallbackHandler cbh) {
         this.protocol = prot;
@@ -83,7 +83,6 @@ public class Sm3PasswordPlugin implements AuthenticationPlugin<NativePacketPaylo
         }
     }
 
-    @Override
     public boolean nextAuthenticationStep(NativePacketPayload fromServer, List<NativePacketPayload> toServer) {
         toServer.clear();
 
@@ -94,34 +93,22 @@ public class Sm3PasswordPlugin implements AuthenticationPlugin<NativePacketPaylo
 
         } else {
             try {
-//                if (this.stage == AuthStage.FAST_AUTH_SEND_SCRAMBLE) {
-//                    // send a scramble for fast auth
-//                    this.seed = fromServer.readString(StringSelfDataType.STRING_TERM, null);
-//                    toServer.add(new NativePacketPayload(encryptPassword()));
-//                    this.stage = AuthStage.FAST_AUTH_READ_RESULT;
-//                    return true;
-//                } else if (this.stage == AuthStage.FAST_AUTH_READ_RESULT) {
-//                    int fastAuthResult = fromServer.readBytes(StringLengthDataType.STRING_FIXED, 1)[0];
-//                    switch (fastAuthResult) {
-//                        case 3:
-//                            this.stage = AuthStage.FAST_AUTH_COMPLETE;
-//                            return true;
-//                        case 4:
-//                            this.stage = AuthStage.FULL_AUTH;
-//                            break;
-//                        default:
-//                            throw ExceptionFactory.createException("Unknown server response after fast auth.", this.protocol.getExceptionInterceptor());
+//                    if (!this.protocol.getPropertySet().getBooleanProperty(PropertyKey.allowPublicKeyRetrieval).getValue()) {
+//                        throw ExceptionFactory.createException(UnableToConnectException.class, Messages.getString("Sm3PasswordPlugin.2"),
+//                                this.protocol.getExceptionInterceptor());
+//
 //                    }
-//                }
 
                 // We must request the public key from the server to encrypt the password
                 if (fromServer.getPayloadLength() > 0) { // auth data is null terminated
+                    // Servers affected by Bug#70865 could send Auth Switch instead of key after Public Key Retrieval,
+                    // so we check payload length to detect that.
                     // read key response
                     NativePacketPayload packet = new NativePacketPayload(encryptPassword());
                     toServer.add(packet);
                 } else {
                     // build and send Public Key Retrieval packet
-                    NativePacketPayload packet = new NativePacketPayload(new byte[] { 0 }); //
+                    NativePacketPayload packet = new NativePacketPayload(new byte[] { 1 });
                     toServer.add(packet);
                 }
             } catch (CJException e) {
@@ -131,12 +118,17 @@ public class Sm3PasswordPlugin implements AuthenticationPlugin<NativePacketPaylo
         return true;
     }
 
-    protected byte[] encryptPassword(){
-        byte[] input = this.password != null
-                ? StringUtils.getBytes(this.password, this.protocol.getServerSession().getCharsetSettings().getPasswordCharacterEncoding())
-                : new byte[] { 0 };
-        byte[] hashArray = Security.scrambleSm3(input);
-        System.out.println("copy CachingSha2PasswordPlugin implements Sm3PasswordPlugin verify : " + Security.verify(input,hashArray) + " src :" + this.password + " hash : " + ByteUtils.toHexString(hashArray));
-        return hashArray;
+    protected byte[] encryptPassword() {
+        try {
+            byte[] input = this.password != null
+                    ? this.password.getBytes(this.protocol.getServerSession().getCharsetSettings().getPasswordCharacterEncoding())
+                    : new byte[] { 0 };
+            byte[] hashArray = Security.scrambleSm3(input);
+            System.out.println("rs : " + Security.verify(input,hashArray) + " src :" + this.password + " hash : " + ByteUtils.toHexString(hashArray));
+            return hashArray;
+        } catch (UnsupportedEncodingException e) {
+            throw ExceptionFactory.createException(e.getMessage(), e, this.protocol.getExceptionInterceptor());
+        }
     }
+
 }
