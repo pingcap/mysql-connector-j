@@ -52,6 +52,8 @@ public class TidbCdcOperate {
 
     public Ticdc ticdc;
 
+    private String useTicdcACID = null;
+
     private AtomicReference<PreparedStatement> preparedStatement;
 
     private Boolean closeFlag = true;
@@ -59,6 +61,7 @@ public class TidbCdcOperate {
     public TidbCdcOperate(ConnectionImpl connection,Ticdc ticdc){
         this.connection = connection;
         this.ticdc = ticdc;
+        this.useTicdcACID = this.ticdc.getUseTicdcACID();
     }
 
     public static TidbCdcOperate of(ConnectionImpl connection,Ticdc ticdc){
@@ -67,12 +70,11 @@ public class TidbCdcOperate {
 
 
 
-    private Boolean isRun(){
-        String useTicdcACID = this.ticdc.getUseTicdcACID();
-        if(useTicdcACID == null){
+    public Boolean isRun(){
+        if(this.useTicdcACID == null){
             return false;
         }
-        return "true".equals(useTicdcACID);
+        return "true".equals(this.useTicdcACID);
     }
 
     /**
