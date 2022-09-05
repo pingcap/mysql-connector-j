@@ -250,7 +250,7 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
         pluginsToInit.add(new AuthenticationKerberosClient());
         pluginsToInit.add(new AuthenticationOciClient());
         pluginsToInit.add(new AuthenticationFidoClient());
-        pluginsToInit.add(new Sm3PasswordPlugin());
+        pluginsToInit.add(new TiDBSM3PasswordPlugin());
 
         // plugins from authenticationPluginClasses connection parameter
         String authenticationPluginClasses = this.propertySet.getStringProperty(PropertyKey.authenticationPlugins).getValue();
