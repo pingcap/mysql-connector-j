@@ -32,19 +32,11 @@ package com.mysql.cj.jdbc;
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.InvocationHandler;
+import java.sql.*;
 import java.sql.Blob;
 import java.sql.Clob;
 import java.sql.DatabaseMetaData;
-import java.sql.DriverManager;
 import java.sql.NClob;
-import java.sql.ResultSet;
-import java.sql.SQLClientInfoException;
-import java.sql.SQLException;
-import java.sql.SQLPermission;
-import java.sql.SQLWarning;
-import java.sql.SQLXML;
-import java.sql.Savepoint;
-import java.sql.Struct;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -54,6 +46,9 @@ import java.util.Random;
 import java.util.Stack;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import com.mysql.cj.CacheAdapter;
@@ -95,6 +90,8 @@ import com.mysql.cj.protocol.SocksProxySocketFactory;
 import com.mysql.cj.util.LRUCache;
 import com.mysql.cj.util.StringUtils;
 import com.mysql.cj.util.Util;
+import com.tidb.jdbc.TidbCdcOperate;
+import com.tidb.snapshot.Ticdc;
 
 /**
  * A Connection represents a session with a specific database. Within the context of a Connection, SQL statements are executed and results are returned.
@@ -111,6 +108,29 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     private static final SQLPermission SET_NETWORK_TIMEOUT_PERM = new SQLPermission("setNetworkTimeout");
 
     private static final SQLPermission ABORT_PERM = new SQLPermission("abort");
+
+    private AtomicLong secondaryTs = new AtomicLong(0);
+
+    /**
+     * sql start transaction and begin start transaction flag
+     */
+    private AtomicBoolean isTxnStart = new AtomicBoolean(false);
+
+    /**
+     * sql start transaction and begin
+     * start transaction
+     * AutoCommit state
+     */
+    private AtomicBoolean isSessAutoCommit = new AtomicBoolean(false);
+
+    private AtomicInteger autoCommitState = new AtomicInteger(0);
+
+
+    private Ticdc ticdc;
+
+    private Boolean useTicdcACID = false;
+
+    private TidbCdcOperate tidbCdcOperate = null;
 
     @Override
     public String getHost() {
@@ -134,6 +154,144 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
         this.topProxy = proxy;
         this.realProxy = this.topProxy instanceof MultiHostMySQLConnection ? ((MultiHostMySQLConnection) proxy).getThisAsProxy() : null;
     }
+
+    public void setSecondaryTs(Long secondaryTs){
+        this.secondaryTs.set(secondaryTs);
+    }
+
+    public Long getSecondaryTs(){
+        return secondaryTs.get();
+    }
+
+    public Ticdc getTicdc() {
+        return ticdc;
+    }
+
+    public void setTicdc(Ticdc ticdc) {
+        this.ticdc = ticdc;
+    }
+
+
+    /**
+     * manual start Transaction refreshSnapshot
+     */
+    private void startTransaction(){
+        try {
+            TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+            if(isTxnStart.get()){
+                isTxnStart.set(false);
+            }
+            isSessAutoCommit.set(true);
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * manual emd Transaction refreshSnapshot
+     */
+    private void endTransaction(){
+        isTxnStart.set(true);
+        isSessAutoCommit.set(false);
+    }
+
+    /**
+     * start Autocommit
+     */
+    private void onAutocommit(){
+        try {
+            setAutoCommit(true);
+            if(isTxnStart.get()){
+                isTxnStart.set(false);
+            }
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void offAutocommit(){
+        try {
+            setAutoCommit(false);
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static Map<String,String> sqlMap = new HashMap<>();
+    static {
+        sqlMap.put("transaction","transaction");
+        sqlMap.put("begin","begin");
+        sqlMap.put("rollback","rollback");
+        sqlMap.put("autocommit","autocommit");
+        sqlMap.put("commit","commit");
+    }
+
+    private Boolean isTransactionSql(String sql){
+        String[] sqlArray = sql.split("\\s+");
+        for (int i=0;i<sqlArray.length;i++){
+            if(sqlMap.containsKey(sqlArray[i])){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     *
+     * Transaction sql flow
+     * @param sql
+     */
+    private void transactionFlow(String sql){
+        try {
+            sql = sql.trim().toLowerCase();
+            if(!isTransactionSql(sql)){
+                return;
+            }
+            if(sql.startsWith("begin") || (sql.contains("start") && sql.contains("transaction"))){
+                startTransaction();
+            }else if(sql.startsWith("commit") || sql.startsWith("rollback")){
+                endTransaction();
+            }else if(sql.contains("set") && sql.contains("autocommit")){
+                if(sql.contains("0") || sql.contains("off")){
+                    offAutocommit();
+                }else if(sql.contains("1") || sql.contains("on")){
+                    onAutocommit();
+                }
+            }
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     *
+     * refresh Snapshot flow
+     * @param sql 
+     */
+    public void refreshSnapshot(String sql){
+        if(!this.useTicdcACID){
+            return;
+        }
+        try {
+            if(sql == null || "".equals(sql)){
+                return;
+            }
+            if(sql.contains("`tidb_cdc`.`syncpoint_v1`")){
+                return;
+            }
+            transactionFlow( sql);
+            if(isTxnStart.get()){
+                TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+                isTxnStart.set(false);
+            }
+            if(getAutoCommit() && !isSessAutoCommit.get()){
+                TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+            }
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
 
     // this connection has to be proxied when using multi-host settings so that statements get routed to the right physical connection
     // (works as "logical" connection)
@@ -374,6 +532,14 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     public ConnectionImpl(HostInfo hostInfo) throws SQLException {
 
         try {
+            this.ticdc = hostInfo.getTicdc();
+            if(this.ticdc != null){
+                String useTicdcACIDString = this.ticdc.getUseTicdcACID();
+                if(useTicdcACIDString != null){
+                    this.useTicdcACID = Boolean.parseBoolean(useTicdcACIDString);
+                }
+            }
+
             // Stash away for later, used to clone this connection for Statement.cancel and Statement.setQueryTimeout().
             this.origHostInfo = hostInfo;
             this.origHostToConnectTo = hostInfo.getHost();
@@ -437,8 +603,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             }
 
             this.dbmd = getMetaData(false, false);
-
             initializeSafeQueryInterceptors();
+
 
         } catch (CJException e1) {
             throw SQLExceptionsMapping.translateException(e1, getExceptionInterceptor());
@@ -792,6 +958,10 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 }
 
                 this.session.execSQL(null, "commit", -1, null, false, this.nullStatementResultSetFactory, null, false);
+                if(this.useTicdcACID){
+                    isTxnStart.set(true);
+                    autoCommitState.set(1);
+                }
             } catch (SQLException sqlException) {
                 if (MysqlErrorNumbers.SQL_STATE_COMMUNICATION_LINK_FAILURE.equals(sqlException.getSQLState())) {
                     throw SQLError.createSQLException(Messages.getString("Connection.4"), MysqlErrorNumbers.SQL_STATE_TRANSACTION_RESOLUTION_UNKNOWN,
@@ -800,6 +970,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
                 throw sqlException;
             } finally {
+                if(this.useTicdcACID){
+                    isTxnStart.set(true);
+                }
                 this.session.setNeedsPing(this.reconnectAtTxEnd.getValue());
             }
         }
@@ -1085,11 +1258,10 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
     @Override
     public java.sql.Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
-
         StatementImpl stmt = new StatementImpl(getMultiHostSafeProxy(), this.database);
         stmt.setResultSetType(resultSetType);
         stmt.setResultSetConcurrency(resultSetConcurrency);
-
+        //StatementProxy proxy = new StatementProxy(this,stmt,ticdc);
         return stmt;
     }
 
@@ -1114,6 +1286,12 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
     public boolean getAutoCommit() throws SQLException {
         synchronized (getConnectionMutex()) {
             return this.session.getServerSession().isAutoCommit();
+        }
+    }
+
+    public boolean getAutocommit() throws SQLException {
+        synchronized (getConnectionMutex()) {
+            return this.session.getServerSession().isAutocommit();
         }
     }
 
@@ -1642,7 +1820,6 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
             } else {
                 pStmt = (ClientPreparedStatement) clientPrepareStatement(nativeSql, resultSetType, resultSetConcurrency, false);
             }
-
             return pStmt;
         }
     }
@@ -1822,6 +1999,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 }
                 try {
                     rollbackNoChecks();
+                    if(this.useTicdcACID){
+                        isTxnStart.set(true);
+                    }
                 } catch (SQLException sqlEx) {
                     // We ignore non-transactional tables if told to do so
                     if (this.ignoreNonTxTables.getInitialValue() && (sqlEx.getErrorCode() == MysqlErrorNumbers.ER_WARNING_NOT_COMPLETE_ROLLBACK)) {
@@ -1838,6 +2018,9 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
 
                 throw sqlException;
             } finally {
+                if(this.useTicdcACID){
+                    isTxnStart.set(true);
+                }
                 this.session.setNeedsPing(this.reconnectAtTxEnd.getValue());
             }
         }
@@ -1911,6 +2094,7 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                     closeStatement(stmt);
                 }
             } finally {
+                isTxnStart.set(true);
                 this.session.setNeedsPing(this.reconnectAtTxEnd.getValue());
             }
         }
@@ -2033,6 +2217,21 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                     this.session.execSQL(null, autoCommitFlag ? "SET autocommit=1" : "SET autocommit=0", -1, null, false, this.nullStatementResultSetFactory,
                             null, false);
                 }
+                if(this.useTicdcACID){
+                    if(!autoCommitFlag){
+                        if(autoCommitState.get() == 1 || autoCommitState.get() == 0){
+                            TidbCdcOperate.of(this,ticdc).refreshSnapshot();
+                        }
+                    }
+                    if(autoCommitFlag){
+                        autoCommitState.set(1);
+                    }else {
+                        autoCommitState.set(2);
+                    }
+                    if(isTxnStart.get()){
+                        isTxnStart.set(false);
+                    }
+                }
             } catch (CJCommunicationsException e) {
                 throw e;
             } catch (CJException e) {
@@ -2040,6 +2239,8 @@ public class ConnectionImpl implements JdbcConnection, SessionEventListener, Ser
                 this.session.getServerSession().setAutoCommit(isAutoCommit);
                 // Update the stacktrace.
                 throw SQLError.createSQLException(e.getMessage(), e.getSQLState(), e.getVendorCode(), e.isTransient(), e, getExceptionInterceptor());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             } finally {
                 if (this.autoReconnectForPools.getValue()) {
                     this.autoReconnect.setValue(false);

@@ -515,6 +515,16 @@ public class NativeSession extends CoreSession implements Serializable {
         }
     }
 
+    public void setSnapshot(String secondaryTs){
+        try {
+            StringBuilder query = new StringBuilder("SET @@tidb_snapshot = ");
+            query.append("\"").append(secondaryTs).append("\"");
+            this.protocol.sendCommand(this.commandBuilder.buildComQuery(null, query.toString()), false, 0);
+        }catch (Exception e){
+            throw ExceptionFactory.createException(e.getMessage(), e);
+        }
+    }
+
     public String getProcessHost() {
         try {
             long threadId = getThreadId();

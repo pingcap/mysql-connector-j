@@ -652,6 +652,7 @@ public class StatementImpl implements JdbcStatement {
         JdbcConnection locallyScopedConn = checkClosed();
 
         synchronized (locallyScopedConn.getConnectionMutex()) {
+            this.connection.refreshSnapshot(sql);
             checkClosed();
 
             checkNullOrEmptyQuery(sql);
@@ -1105,7 +1106,7 @@ public class StatementImpl implements JdbcStatement {
     public java.sql.ResultSet executeQuery(String sql) throws SQLException {
         synchronized (checkClosed().getConnectionMutex()) {
             JdbcConnection locallyScopedConn = this.connection;
-
+            locallyScopedConn.refreshSnapshot(sql);
             this.retrieveGeneratedKeys = false;
 
             checkNullOrEmptyQuery(sql);
@@ -1249,7 +1250,7 @@ public class StatementImpl implements JdbcStatement {
     protected long executeUpdateInternal(String sql, boolean isBatch, boolean returnGeneratedKeys) throws SQLException {
         synchronized (checkClosed().getConnectionMutex()) {
             JdbcConnection locallyScopedConn = this.connection;
-
+            locallyScopedConn.refreshSnapshot(sql);
             checkNullOrEmptyQuery(sql);
 
             resetCancelledState();
