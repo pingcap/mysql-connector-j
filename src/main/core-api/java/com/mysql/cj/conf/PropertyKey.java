@@ -185,6 +185,7 @@ public enum PropertyKey {
     processEscapeCodesForPrepStmts("processEscapeCodesForPrepStmts", true), //
     profilerEventHandler("profilerEventHandler", true), //
     profileSQL("profileSQL", true), //
+    reset("reset", true), //
     propertiesTransform("propertiesTransform", true), //
     queriesBeforeRetrySource("queriesBeforeRetrySource", "queriesBeforeRetryMaster", true), //
     queryInterceptors("queryInterceptors", true), //

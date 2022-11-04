@@ -76,6 +76,8 @@ public class ServerPreparedQuery extends ClientPreparedQuery {
     /** The "profileSQL" connection property value */
     protected boolean profileSQL = false;
 
+    protected boolean reset = true;
+
     /** The "gatherPerfMetrics" connection property value */
     protected boolean gatherPerfMetrics;
 
@@ -110,6 +112,7 @@ public class ServerPreparedQuery extends ClientPreparedQuery {
         this.explainSlowQueries = sess.getPropertySet().getBooleanProperty(PropertyKey.explainSlowQueries);
         this.useCursorFetch = sess.getPropertySet().getBooleanProperty(PropertyKey.useCursorFetch).getValue();
         this.commandBuilder = (NativeMessageBuilder) sess.getProtocol().getMessageBuilder();
+        this.reset = sess.getPropertySet().getStringProperty(PropertyKey.reset) == null ? true : Boolean.valueOf(sess.getPropertySet().getStringProperty(PropertyKey.reset).getValue());
     }
 
     /**
@@ -223,7 +226,9 @@ public class ServerPreparedQuery extends ClientPreparedQuery {
             }
 
             // Okay, we've got all "newly"-bound streams, so reset server-side state to clear out previous bindings
-            serverResetStatement();
+            if (reset) {
+                serverResetStatement();
+            }
         }
 
         this.queryBindings.checkAllParametersSet();
@@ -558,7 +563,8 @@ public class ServerPreparedQuery extends ClientPreparedQuery {
 
         if (this.queryBindings != null) {
             hadLongData = this.queryBindings.clearBindValues();
-            this.queryBindings.setLongParameterSwitchDetected(clearServerParameters && hadLongData ? false : true);
+            //this.queryBindings.setLongParameterSwitchDetected(clearServerParameters && hadLongData ? false : true);
+            this.queryBindings.setLongParameterSwitchDetected(clearServerParameters && hadLongData);
         }
 
         if (clearServerParameters && hadLongData) {
@@ -570,8 +576,10 @@ public class ServerPreparedQuery extends ClientPreparedQuery {
         this.session.checkClosed();
         synchronized (this.session) {
             try {
-                this.session.getProtocol().sendCommand(this.commandBuilder.buildComStmtReset(this.session.getSharedSendPacket(), this.serverStatementId), false,
-                        0);
+                if (reset) {
+                    this.session.getProtocol().sendCommand(this.commandBuilder.buildComStmtReset(this.session.getSharedSendPacket(), this.serverStatementId), false,
+                            0);
+                }
             } finally {
                 this.session.clearInputStream();
             }
