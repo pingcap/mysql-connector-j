@@ -49,6 +49,11 @@ public class TiDBSM3PasswordPlugin extends CachingSha2PasswordPlugin {
     }
 
     @Override
+    public boolean requiresConfidentiality() {
+        return true;
+    }
+
+    @Override
     public boolean nextAuthenticationStep(NativePacketPayload fromServer, List<NativePacketPayload> toServer) {
         toServer.clear();
 
