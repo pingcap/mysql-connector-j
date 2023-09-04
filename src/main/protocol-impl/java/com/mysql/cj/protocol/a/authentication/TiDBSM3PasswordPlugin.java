@@ -34,6 +34,7 @@ import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.exceptions.ExceptionFactory;
 import com.mysql.cj.exceptions.UnableToConnectException;
 import com.mysql.cj.protocol.SecuritySm3;
+import com.mysql.cj.protocol.Security;
 import com.mysql.cj.protocol.a.NativeConstants;
 import com.mysql.cj.protocol.a.NativePacketPayload;
 import com.mysql.cj.util.StringUtils;
@@ -46,6 +47,11 @@ public class TiDBSM3PasswordPlugin extends CachingSha2PasswordPlugin {
     @Override
     public String getProtocolPluginName() {
         return PLUGIN_NAME;
+    }
+
+    @Override
+    public boolean requiresConfidentiality() {
+        return true;
     }
 
     @Override
